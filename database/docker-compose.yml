@@ -1,0 +1,135 @@
+version: '3.8'
+
+services:
+  # Config servers (3-member replica set)
+  config1:
+    image: mongo:7.0
+    command: mongod --configsvr --replSet configReplSet --bind_ip_all --port ${DB_CONFIG_PORT1}
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${DB_ROOT_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${DB_ROOT_PASS}
+    volumes:
+      - config1:/data/db
+    networks:
+      - mongo-cluster
+
+  config2:
+    image: mongo:7.0
+    command: mongod --configsvr --replSet configReplSet --bind_ip_all --port ${DB_CONFIG_PORT2}
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${DB_ROOT_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${DB_ROOT_PASS}
+    volumes:
+      - config2:/data/db
+    networks:
+      - mongo-cluster
+
+  config3:
+    image: mongo:7.0
+    command: mongod --configsvr --replSet configReplSet --bind_ip_all --port ${DB_CONFIG_PORT3}
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${DB_ROOT_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${DB_ROOT_PASS}
+    volumes:
+      - config3:/data/db
+    networks:
+      - mongo-cluster
+
+  # Shard 1 Servers
+  shard1a:
+    image: mongo:7.0
+    command: mongod --shardsvr --replSet shard1 --bind_ip_all --port ${DB_SHARD1A_PORT}
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${DB_ROOT_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${DB_ROOT_PASS}
+    volumes:
+      - shard1a:/data/db
+    networks:
+      - mongo-cluster
+
+  shard1b:
+    image: mongo:7.0
+    command: mongod --shardsvr --replSet shard1 --bind_ip_all --port ${DB_SHARD1B_PORT}
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${DB_ROOT_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${DB_ROOT_PASS}
+    volumes:
+      - shard1b:/data/db
+    networks:
+      - mongo-cluster
+
+  # Shard 2 Servers
+  shard2a:
+    image: mongo:7.0
+    command: mongod --shardsvr --replSet shard2 --bind_ip_all --port ${DB_SHARD2A_PORT}
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${DB_ROOT_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${DB_ROOT_PASS}
+    volumes:
+      - shard2a:/data/db
+    networks:
+      - mongo-cluster
+
+  shard2b:
+    image: mongo:7.0
+    command: mongod --shardsvr --replSet shard2 --bind_ip_all --port ${DB_SHARD2B_PORT}
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${DB_ROOT_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${DB_ROOT_PASS}
+    volumes:
+      - shard2b:/data/db
+    networks:
+      - mongo-cluster
+
+  # Mongos Service
+  mongos:
+    image: mongo:7.0
+    depends_on:
+      - config1
+      - config2
+      - config3
+      - shard1a
+      - shard1b
+      - shard2a
+      - shard2b
+    command: mongos --configdb configReplSet/config1:${DB_CONFIG_PORT1},config2:${DB_CONFIG_PORT2},config3:${DB_CONFIG_PORT3} --bind_ip_all --port ${DB_PORT}
+    ports:
+      - "${DB_PORT}:${DB_PORT}"
+    networks:
+      - mongo-cluster
+
+  # MongoDB initialization for app user
+  mongo-init:
+    image: mongo:7.0
+    depends_on:
+      - mongos
+    environment:
+      - DB_ROOT_USER=${DB_ROOT_USER}
+      - DB_ROOT_PASS=${DB_ROOT_PASS}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_NAME=${DB_NAME}
+    entrypoint: >
+      bash -c "
+      sleep 30;
+      mongo --host mongos --port ${DB_PORT} -u ${DB_ROOT_USER} -p ${DB_ROOT_PASS} --authenticationDatabase admin <<EOF
+      use ${DB_NAME};
+      db.createUser({user: '${DB_USER}', pwd: '${DB_PASS}', roles: [{role: 'readWrite', db: '${DB_NAME}'}]});
+      EOF
+      "
+    networks:
+      - mongo-cluster
+
+networks:
+  mongo-cluster:
+    driver: bridge
+
+volumes:
+  config1:
+  config2:
+  config3:
+  shard1a:
+  shard1b:
+  shard2a:
+  shard2b:
