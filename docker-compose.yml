@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:7.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${DB_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${DB_ROOT_PASS}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+
+    ports:
+      - "${DB_PORT}:${DB_PORT}"
+    volumes:
+      - mongo_data:/data/db  # Persists MongoDB data between container restarts
+      - ./database/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js
+
+volumes:
+  mongo_data:
