@@ -3,13 +3,29 @@ from typing import List
 from bson import ObjectId
 
 from .schemas import Url, UrlCreate
-from .services import UrlService, get_url_service
-from .auth import JWTBearer
+from .services.url_service import UrlService, get_url_service, UrlNotValidException, UrlAlreadyExistsException
+from .services.auth import JWTBearer
+from .services.database import database_service
+from .services.http_service import http_service
 
 app = FastAPI()
 
 
-# TODO Error handling, atomic transactions
+@app.on_event("startup")
+async def startup_event():
+    # Initialize the database connection on startup
+    await database_service.connect()
+    # Initialize the HTTP service session on startup
+    await http_service.connect()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    # Close the database connection on shutdown
+    await database_service.disconnect()
+    # Close the HTTP service session on shutdown
+    await http_service.disconnect()
+
 
 @app.get('/urls/{id}', response_model=Url)
 async def read(
@@ -19,7 +35,7 @@ async def read(
 ):
     try:
         object_id = ObjectId(url_id)  # Convert string to ObjectId
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Invalid ObjectId")
 
     url = await url_service.read(object_id, owner_id)
@@ -46,10 +62,14 @@ async def update(
 ):
     try:
         object_id = ObjectId(url_id)  # Convert string to ObjectId
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Invalid ObjectId")
 
-    updated_url = await url_service.update(object_id, update_data, owner_id)
+    try:
+        updated_url = await url_service.update(object_id, update_data, owner_id)
+    except (UrlAlreadyExistsException, UrlNotValidException) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     if updated_url is None:
         raise HTTPException(status_code=404, detail=f'Url with id={url_id} not found')
     return updated_url
@@ -61,7 +81,11 @@ async def create(
         owner_id: str = Depends(JWTBearer()),
         url_service: UrlService = Depends(get_url_service)
 ):
-    url = await url_service.create(create_data, owner_id)
+    try:
+        url = await url_service.create(create_data, owner_id)
+    except (UrlAlreadyExistsException, UrlNotValidException) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     return url
 
 
@@ -73,7 +97,7 @@ async def delete(
 ):
     try:
         object_id = ObjectId(url_id)  # Convert string to ObjectId
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=400, detail="Invalid ObjectId")
 
     is_deleted = await url_service.delete(object_id, owner_id)

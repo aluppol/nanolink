@@ -1,5 +1,5 @@
 from fastapi import HTTPException, Security
-from fastapi.security  import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
 import os
 
