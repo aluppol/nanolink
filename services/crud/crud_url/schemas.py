@@ -1,17 +1,26 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from datetime import datetime
 from typing import Optional
+from bson import ObjectId
 
 
 class BaseItemModel(BaseModel):
-    id: int = Field(..., alias="_id")
+    id: str
     created_at: datetime
-    updated_at: Optional[datetime]
-    deleted_at: Optional[datetime]
+    updated_at: Optional[datetime] = None
+    deleted_at: Optional[datetime] = None
+
+    @model_validator(mode='before')
+    def convert_objectid(cls, values):
+        if '_id' in values and isinstance(values['_id'], ObjectId):
+            values['id'] = str(values['_id'])
+        return values
+
+
 
     class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
+        from_attributes = True
+        populate_by_name = True
 
 
 class UrlBase(BaseModel):
@@ -27,5 +36,5 @@ class Url(UrlBase, BaseItemModel):
     owner_id: str
 
     class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
+        from_attributes = True
+        populate_by_name = True
