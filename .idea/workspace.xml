@@ -5,19 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="81329931-dba5-4017-888a-9bb262c4d4a3" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/services/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/services/crud/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/services/crud/crud_url/services/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/services/crud/crud_url/services/database.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/services/crud/crud_url/services/http_service.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/services/crud/crud_url/services/short_url_service.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/services/crud/crud_url/services/url_service.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/crud/crud_url/auth.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/crud/crud_url/services/auth.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/crud/crud_url/database.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/crud/crud_url/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/crud/crud_url/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/crud/crud_url/middlewares.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/crud/crud_url/services.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/crud/crud_url/services/auth.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/crud/crud_url/services/auth.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/crud/crud_url/services/http_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/crud/crud_url/services/http_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/crud/crud_url/services/url_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/crud/crud_url/services/url_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/crud/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/services/crud/requirements.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

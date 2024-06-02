@@ -15,7 +15,7 @@ class JWTBearer(HTTPBearer):
             if credentials.scheme != "Bearer":
                 raise HTTPException(status_code=403, detail="Invalid authentication scheme.")
             token = credentials.credentials
-            return 'test'
+            return 'test'   # TODO remove after auth microservice implementation
             # return self.decode_token(token)
 
     def decode_token(self, token: str):

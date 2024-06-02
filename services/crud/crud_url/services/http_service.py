@@ -1,9 +1,17 @@
 import aiohttp
+import ssl
+import certifi
+import os
 
 
-class HTTPService:  # TODO SSL certificates
+class HTTPService:
     def __init__(self):
         self.session = None
+        self.ssl_context = ssl.create_default_context(cafile=certifi.where())
+
+    async def fetch_url(self, url, **params):
+        async with self.session.get(url, ssl=self.ssl_context, **params) as response:
+            return response
 
     async def connect(self):
         if self.session is None:

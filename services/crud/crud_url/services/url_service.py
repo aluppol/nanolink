@@ -29,7 +29,7 @@ class UrlService:
                  https: HTTPService):
         self.collection = db.get_collection("Urls")
         self.sus = sus
-        self.session = https.get_session()
+        self.https = https
 
     async def close(self):
         if self.session:
@@ -48,9 +48,9 @@ class UrlService:
                 or there is a client-side error.
         """
         try:
-            async with self.session.get(url) as response:
-                if response.status >= 400:
-                    raise UrlNotValidException(url, response.reason)
+            response = await self.https.fetch_url(url)
+            if response.status >= 400:
+                raise UrlNotValidException(url, response.reason)
         except aiohttp.ClientError as e:
             raise UrlNotValidException(url, str(e))
 
