@@ -1,6 +1,34 @@
 version: '3.8'
 
 services:
+  crud_url:
+    build: ./services/crud
+    ports:
+      - "${CRUD_URL_PORT}:8000"
+    volumes:
+      - ./services/crud/app:/app
+    depends_on:
+      - mongo
+    networks:
+      - app_network
+    environment:
+        DB_NAME: ${DB_NAME}
+        DB_USER: ${DB_USER}
+        DB_PASS: ${DB_PASS}
+        DB_HOST: ${DB_HOST}
+        DB_PORT: ${DB_PORT}
+        ENV: ${ENV}
+
+        JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
+        JWT_ALGORITHM: ${JWT_ALGORITHM}
+    command: >
+      sh -c "if [ \"$$ENV\" = 'dev' ]; then 
+                python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload;
+             else 
+                python -m uvicorn main:app --host 0.0.0.0 --port 8000;
+             fi"
+
+
   mongo:
     image: mongo:7.0
     environment:
@@ -11,10 +39,16 @@ services:
       DB_PASS: ${DB_PASS}
 
     ports:
-      - "${DB_PORT}:${DB_PORT}"
+      - "${DB_PORT}:27017"
+    networks:
+      - app_network
     volumes:
       - mongo_data:/data/db  # Persists MongoDB data between container restarts
       - ./database/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js
 
 volumes:
   mongo_data:
+
+networks:
+  app_network:
+    driver: bridge

@@ -1,7 +1,6 @@
 import aiohttp
 import ssl
 import certifi
-import os
 
 
 class HTTPService:

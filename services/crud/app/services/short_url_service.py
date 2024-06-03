@@ -3,7 +3,7 @@ import random
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from fastapi import Depends
-from .database import get_database_service
+from services.database import get_database_service
 
 
 class ShortUrlService:

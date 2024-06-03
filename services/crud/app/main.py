@@ -2,11 +2,11 @@ from fastapi import FastAPI, Depends, HTTPException
 from typing import List
 from bson import ObjectId
 
-from .schemas import Url, UrlCreate
-from .services.url_service import UrlService, get_url_service, UrlNotValidException, UrlAlreadyExistsException
-from .services.auth import JWTBearer
-from .services.database import database_service
-from .services.http_service import http_service
+from schemas import Url, UrlCreate
+from services.url_service import UrlService, get_url_service, UrlNotValidException, UrlAlreadyExistsException
+from services.auth import JWTBearer
+from services.database import database_service
+from services.http_service import http_service
 
 app = FastAPI()
 
