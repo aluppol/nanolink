@@ -1,6 +1,6 @@
 import os
-import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.errors import ConnectionFailure
 
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
@@ -10,35 +10,49 @@ DB_NAME = os.getenv("DB_NAME")
 
 
 class DatabaseService:
-    def __init__(self, db_user: str, db_pass: str, db_host: str, db_port: str, db_name: str):
-        # Construct the MongoDB URI
-        self.db_uri = f"mongodb://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
-        self.db_name = db_name
-        self.client = None
-        self.db = None
+    def __init__(
+            self,
+            db_user: str,
+            db_pass: str,
+            db_host: str,
+            db_port: str,
+            db_name: str,
+            # maxPoolSize=None,
+            # minPoolSize=None,
+            # maxIdleTimeMS=None,
+    ):
+        self.__db_uri = f"mongodb://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+        self.__db_name = db_name
+        self.__client = None
+        self.__db = None
+        self.__check_connection_interval_s = 100    # seconds
 
-    async def connect(self, retries=5, delay=10):
-        for attempt in range(1, retries + 1):
-            try:
-                self.client = AsyncIOMotorClient(self.db_uri)
-                self.db = self.client[self.db_name]
-                # The first operation that actually initiates a connection attempt
-                await self.db.command("ping")
-                print("Connected to the database successfully.")
-                return
-            except Exception as e:
-                print(f"Attempt {attempt}: Error connecting to the database: {e}")
-                self.client.close()
-                if attempt == retries:
-                    raise e
-                await asyncio.sleep(delay * 2 ** (attempt - 1))  # Exponential backoff
+        # connection pool config
+        # self.__max_pool_size = maxPoolSize         # 100 if not set
+        # self.__min_pool_size = minPoolSize         # 0 if not set
+        # self.__max_idle_time_ms = maxIdleTimeMS    # 10s if not set
+
+    async def connect(self):
+        try:
+            self.__client = AsyncIOMotorClient(
+                self.__db_uri,
+                # maxPoolSize=self.__max_pool_size,
+                # minPoolSize=self.__min_pool_size,
+                # maxIdleTimeMS=self.__max_idle_time_ms
+            )
+            self.__db = self.__client[self.__db_name]
+            await self.__client.admin.command('ping')  # Check the connection
+        except ConnectionFailure:
+            self.__client = None
+            self.__db = None
+            raise ConnectionFailure("Database connection failed.")
 
     async def disconnect(self):
-        self.client.close()
+        self.__client.close()
         print("Disconnected from the database.")
 
     def get_database(self):
-        return self.db
+        return self.__db
 
 
 database_service = DatabaseService(DB_USER, DB_PASS, DB_HOST, DB_PORT, DB_NAME)

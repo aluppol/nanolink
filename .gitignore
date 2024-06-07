@@ -64,6 +64,7 @@ logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+package-lock.json
 
 # Runtime data
 pids
@@ -88,7 +89,6 @@ coverage
 bower_components
 
 # node_modules
-node_modules/
 node_modules/
 
 # Optional eslint cache

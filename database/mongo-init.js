@@ -18,6 +18,9 @@ try {
       db: process.env.DB_NAME
     }]
   });
+
+  db.getCollection('Urls').createIndex({ 'short_url': 1 }, { unique: true })
+  
 } catch (e) {
   print(`Error during initialization: ${e}`);
 }
