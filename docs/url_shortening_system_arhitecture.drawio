@@ -1,0 +1,209 @@
+<mxfile host="app.diagrams.net" modified="2024-05-23T16:59:04.375Z" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36" etag="bMJubhbqzTsDlAQ5Rqss" version="24.3.1" type="google">
+  <diagram name="Page-1" id="F-y-0sWaQkqpVioM3E1m">
+    <mxGraphModel grid="1" page="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="bNnXcnh-NX75GQILxVVv-1" value="creator" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="120" width="30" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-2" value="client" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="290" width="30" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-3" value="create url service&lt;br&gt;(batch)" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="630" y="120" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-6" value="Distributed queue (tasks grouped by auth user id)" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#232F3E;fillColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.queue;" vertex="1" parent="1">
+          <mxGeometry x="400" y="105" width="90" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-7" value="auth service&lt;br&gt;(black box)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#CCCCCC;" vertex="1" parent="1">
+          <mxGeometry x="160" y="-120" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-9" value="" style="endArrow=classic;html=1;rounded=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="bNnXcnh-NX75GQILxVVv-1" target="bNnXcnh-NX75GQILxVVv-24">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="410" as="sourcePoint" />
+            <mxPoint x="180" y="150" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-10" value="POST&lt;br&gt;body: long url" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="bNnXcnh-NX75GQILxVVv-9">
+          <mxGeometry x="-0.3455" y="-1" relative="1" as="geometry">
+            <mxPoint x="14" y="-1" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-13" value="notification service" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="630" y="30" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-14" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" edge="1" parent="1" source="bNnXcnh-NX75GQILxVVv-24" target="bNnXcnh-NX75GQILxVVv-7">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="220" y="110" as="sourcePoint" />
+            <mxPoint x="240" y="20" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-15" value="auth request:&lt;br&gt;auth user id, true, else 403" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="bNnXcnh-NX75GQILxVVv-14">
+          <mxGeometry x="0.2353" y="2" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-16" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="bNnXcnh-NX75GQILxVVv-24" target="bNnXcnh-NX75GQILxVVv-6">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="260" y="150" as="sourcePoint" />
+            <mxPoint x="380" y="20" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-17" value="long url, user auth id" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="bNnXcnh-NX75GQILxVVv-16">
+          <mxGeometry x="-0.5333" y="1" relative="1" as="geometry">
+            <mxPoint x="1" y="-33" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-19" value="" style="endArrow=classic;html=1;rounded=0;dashed=1;entryX=1;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="bNnXcnh-NX75GQILxVVv-6" target="bNnXcnh-NX75GQILxVVv-24">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="180" as="sourcePoint" />
+            <mxPoint x="240" y="170" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-20" value="ack 1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="bNnXcnh-NX75GQILxVVv-19">
+          <mxGeometry x="-0.4375" y="3" relative="1" as="geometry">
+            <mxPoint x="-2" y="14" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-21" value="" style="endArrow=classic;html=1;rounded=0;dashed=1;exitX=0;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="bNnXcnh-NX75GQILxVVv-24">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="150" y="210" as="sourcePoint" />
+            <mxPoint x="80" y="180" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-22" value="ack 2" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="bNnXcnh-NX75GQILxVVv-21">
+          <mxGeometry x="-0.4375" y="3" relative="1" as="geometry">
+            <mxPoint x="-35" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-24" value="api gateway" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="185" y="120" width="70" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-25" value="Email" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;strokeColor=#232F3E;fillColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.email;" vertex="1" parent="1">
+          <mxGeometry x="40" y="50" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-26" value="" style="endArrow=classic;html=1;rounded=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="bNnXcnh-NX75GQILxVVv-6" target="bNnXcnh-NX75GQILxVVv-3">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="170" as="sourcePoint" />
+            <mxPoint x="450" y="120" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-27" value="pulll messages" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="bNnXcnh-NX75GQILxVVv-26">
+          <mxGeometry y="3" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-28" value="log disk" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" vertex="1" parent="1">
+          <mxGeometry x="415" y="-50" width="60" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-30" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="bNnXcnh-NX75GQILxVVv-6" target="bNnXcnh-NX75GQILxVVv-28">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="430" y="90" as="sourcePoint" />
+            <mxPoint x="480" y="40" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-31" value="queue tasks duplication" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="bNnXcnh-NX75GQILxVVv-30">
+          <mxGeometry x="0.4667" y="-3" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-32" value="data storage&lt;br&gt;(mongoDB)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;" vertex="1" parent="1">
+          <mxGeometry x="640" y="220" width="100" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-33" value="" style="endArrow=classic;html=1;rounded=0;entryX=0.5;entryY=0.091;entryDx=0;entryDy=0;entryPerimeter=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" edge="1" parent="1" source="bNnXcnh-NX75GQILxVVv-3" target="bNnXcnh-NX75GQILxVVv-32">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="600" y="220" as="sourcePoint" />
+            <mxPoint x="450" y="430" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-34" value="create multiple urls" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="bNnXcnh-NX75GQILxVVv-33">
+          <mxGeometry x="-0.2801" y="4" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-35" value="" style="endArrow=classic;html=1;rounded=0;entryX=0;entryY=0.75;entryDx=0;entryDy=0;dashed=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="bNnXcnh-NX75GQILxVVv-32" target="bNnXcnh-NX75GQILxVVv-3">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="610" y="240" as="sourcePoint" />
+            <mxPoint x="450" y="120" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="600" y="275" />
+              <mxPoint x="600" y="165" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-37" value="ack 3" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="bNnXcnh-NX75GQILxVVv-35">
+          <mxGeometry x="-0.3799" relative="1" as="geometry">
+            <mxPoint x="-20" y="-39" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-38" value="" style="endArrow=classic;html=1;rounded=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="bNnXcnh-NX75GQILxVVv-3" target="bNnXcnh-NX75GQILxVVv-13">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="170" as="sourcePoint" />
+            <mxPoint x="450" y="120" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-44" value="result to creator after ack 3" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="bNnXcnh-NX75GQILxVVv-38">
+          <mxGeometry x="-0.3333" y="-2" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-40" value="" style="endArrow=classic;html=1;rounded=0;" edge="1" parent="1" source="bNnXcnh-NX75GQILxVVv-13" target="bNnXcnh-NX75GQILxVVv-25">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="400" y="170" as="sourcePoint" />
+            <mxPoint x="450" y="120" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-41" value="notify creator on sccess with short url, or inform of any issue of occures" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="bNnXcnh-NX75GQILxVVv-40">
+          <mxGeometry x="0.1036" y="1" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-46" value="redirect service&lt;br&gt;(had fallback option - direct to db when cache is not available)" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="155" y="270" width="125" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-47" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.3333333333333333;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="bNnXcnh-NX75GQILxVVv-2" target="bNnXcnh-NX75GQILxVVv-46">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="350" y="310" as="sourcePoint" />
+            <mxPoint x="400" y="260" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-48" value="GET short url (1)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="bNnXcnh-NX75GQILxVVv-47">
+          <mxGeometry x="-0.1238" y="2" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-49" value="distributed cache&lt;br&gt;(read through pattern)" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="370" y="280" width="160" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-50" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0.07;entryY=0.4;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="bNnXcnh-NX75GQILxVVv-46" target="bNnXcnh-NX75GQILxVVv-49">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="350" y="310" as="sourcePoint" />
+            <mxPoint x="400" y="260" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-51" value="get short url (2)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="bNnXcnh-NX75GQILxVVv-50">
+          <mxGeometry x="0.2503" relative="1" as="geometry">
+            <mxPoint x="-13" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-52" value="" style="endArrow=classic;html=1;rounded=0;entryX=0;entryY=1;entryDx=0;entryDy=-15;entryPerimeter=0;exitX=0.875;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;" edge="1" parent="1" source="bNnXcnh-NX75GQILxVVv-49" target="bNnXcnh-NX75GQILxVVv-32">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="350" y="310" as="sourcePoint" />
+            <mxPoint x="400" y="260" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-53" value="Text" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="bNnXcnh-NX75GQILxVVv-52">
+          <mxGeometry x="0.3737" y="1" relative="1" as="geometry">
+            <mxPoint x="-19" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bNnXcnh-NX75GQILxVVv-57" value="get short url(3)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" connectable="0" vertex="1" parent="bNnXcnh-NX75GQILxVVv-52">
+          <mxGeometry x="0.0839" y="-1" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
