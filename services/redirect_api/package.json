@@ -12,8 +12,13 @@
   "license": "ISC",
   "description": "Redirect api - part of url shortening system",
   "dependencies": {
+    "@fastify/awilix": "^5.1.0",
+    "@fastify/mongodb": "^8.0.0",
+    "@fastify/swagger": "^8.14.0",
     "@fastify/type-provider-json-schema-to-ts": "^3.0.0",
-    "fastify": "^4.27.0"
+    "awilix": "^10.0.2",
+    "fastify": "^4.27.0",
+    "mongodb": "^6.7.0"
   },
   "devDependencies": {
     "@types/node": "^20.14.1",

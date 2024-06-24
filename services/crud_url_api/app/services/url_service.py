@@ -10,6 +10,10 @@ from services.database import get_database_service
 from services.short_url_service import ShortUrlService, get_short_url_service
 from services.http_service import HTTPService, get_http_service
 from schemas import UrlCreate, Url
+from helpers import get_env_variable
+
+
+DB_URLS_COLLECTION_NAME = get_env_variable("DB_URLS_COLLECTION_NAME")
 
 
 class UrlAlreadyExistsException(Exception):
@@ -27,7 +31,7 @@ class UrlService:
                  db: AsyncIOMotorClient,
                  sus: ShortUrlService,
                  https: HTTPService):
-        self.collection = db.get_collection("Urls")
+        self.collection = db.get_collection(DB_URLS_COLLECTION_NAME)
         self.sus = sus
         self.https = https
 

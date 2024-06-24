@@ -1,5 +1,6 @@
 import { FastifyInstance } from "fastify"
 import { FromSchema } from "json-schema-to-ts";
+import { UrlService } from "./services";
 
 const redirectSchema = {
     type: 'object',
@@ -26,7 +27,20 @@ export async function redirectController(fastify: FastifyInstance, options: any)
         },
         async (req, res) => {
             const { shortUrl } = req.params;
-
+            const urlService = fastify.diContainer.resolve<UrlService>('urlService');
+            
+            try {
+                const longUrl = await urlService.getLongUrl(shortUrl, req)
+                if (longUrl) {
+                    res.redirect(302, longUrl);
+                } else {
+                    res.status(404).send({ error: 'URL not found' });
+                }
+            } catch (err) {
+                fastify.log.error(err);
+              res.status(500).send({ error: 'Internal Server Error' });
+            }
         },
+        
     )
 }

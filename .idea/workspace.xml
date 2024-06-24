@@ -5,15 +5,19 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="81329931-dba5-4017-888a-9bb262c4d4a3" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/services/crud/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/services/crud/app/controllers/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/services/crud/app/controllers/url_controller.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/services/crud/app/exception_handlers.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/database/mongo-init.js" beforeDir="false" afterPath="$PROJECT_DIR$/database/mongo-init.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/services/crud/app/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/crud/app/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docker-compose.yml" beforeDir="false" afterPath="$PROJECT_DIR$/docker-compose.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/crud/app/services/auth.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/crud/app/services/auth.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/services/crud/app/services/database.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/crud/app/services/database.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/crud/app/services/short_url_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/crud/app/services/short_url_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/crud/app/services/url_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/crud/app/services/url_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/crud/run.py" beforeDir="false" afterPath="$PROJECT_DIR$/services/crud/run.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/redirect_api/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/services/redirect_api/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/redirect_api/src/redirectController.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/redirect_api/src/redirectController.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/redirect_api/src/server.ts" beforeDir="false" afterPath="$PROJECT_DIR$/services/redirect_api/src/server.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/redirect_api/src/urlsRepository.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/services/redirect_api/src/urlsSerivce.ts" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

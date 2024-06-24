@@ -1,14 +1,15 @@
 from fastapi import HTTPException, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
-import os
+
+from helpers import get_env_variable
 
 
 class JWTBearer(HTTPBearer):
     def __init__(self, auto_error: bool = True):
         super(JWTBearer, self).__init__(auto_error=auto_error)
-        self.public_key = os.getenv("JWT_PUBLIC_KEY")
-        self.algorithm = os.getenv("JWT_ALGORITHM")
+        self.public_key = get_env_variable("JWT_PUBLIC_KEY")
+        self.algorithm = get_env_variable("JWT_ALGORITHM")
 
     async def __call__(self, credentials: HTTPAuthorizationCredentials = Security(HTTPBearer())):
         if credentials:

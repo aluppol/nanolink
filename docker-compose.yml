@@ -1,22 +1,45 @@
 version: '3.8'
 
 services:
-  crud_url:
-    build: ./services/crud
+  mongo:
+    image: mongo:7.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${DB_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${DB_ROOT_PASS}
+      DB_NAME: ${DB_NAME}
+      DB_CRUD_USER: ${DB_CRUD_USER}
+      DB_CRUD_PASS: ${DB_CRUD_PASS}
+      DB_REDIRECT_USER: ${DB_REDIRECT_USER}
+      DB_REDIRECT_PASS: ${DB_REDIRECT_PASS}
+      DB_URLS_COLLECTION_NAME: ${DB_URLS_COLLECTION_NAME}
+
+    ports:
+      - "${DB_PORT}:27017"
+    networks:
+      - app_network
+    volumes:
+      - mongo_data:/data/db  # Persists MongoDB data between container restarts
+      - ./database/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js
+
+
+  crud_url_api:
+    build: ./services/crud_url_api
     ports:
       - "${CRUD_URL_PORT}:8000"
     volumes:
-      - ./services/crud/app:/app
+      - ./services/crud_url_api/app:/app
     depends_on:
       - mongo
     networks:
       - app_network
     environment:
+        CRUD_URL_PORT: ${CRUD_URL_PORT}
         DB_NAME: ${DB_NAME}
-        DB_USER: ${DB_USER}
-        DB_PASS: ${DB_PASS}
+        DB_CRUD_USER: ${DB_CRUD_USER}
+        DB_CRUD_PASS: ${DB_CRUD_PASS}
         DB_HOST: ${DB_HOST}
         DB_PORT: ${DB_PORT}
+        DB_URLS_COLLECTION_NAME: ${DB_URLS_COLLECTION_NAME}
         ENV: ${ENV}
 
         JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
@@ -29,22 +52,33 @@ services:
              fi"
 
 
-  mongo:
-    image: mongo:7.0
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${DB_ROOT_USER}
-      MONGO_INITDB_ROOT_PASSWORD: ${DB_ROOT_PASS}
-      DB_NAME: ${DB_NAME}
-      DB_USER: ${DB_USER}
-      DB_PASS: ${DB_PASS}
-
+  redirect_api:
+    build: ./services/redirect_api
     ports:
-      - "${DB_PORT}:27017"
+      - "${REDIRECT_API_PORT}:${REDIRECT_API_PORT}"
+    volumes:
+      - ./services/redirect_api/src:/app/src
+    depends_on:
+      - mongo
     networks:
       - app_network
-    volumes:
-      - mongo_data:/data/db  # Persists MongoDB data between container restarts
-      - ./database/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js
+    environment:
+        REDIRECT_API_PORT: ${REDIRECT_API_PORT}
+        DB_NAME: ${DB_NAME}
+        DB_REDIRECT_USER: ${DB_REDIRECT_USER}
+        DB_REDIRECT_PASS: ${DB_REDIRECT_PASS}
+        DB_HOST: ${DB_HOST}
+        DB_PORT: ${DB_PORT}
+        DB_URLS_COLLECTION_NAME: ${DB_URLS_COLLECTION_NAME}
+        ENV: ${ENV}
+
+    command: >
+      sh -c "if [ \"$$ENV\" = 'dev' ]; then 
+                npm run dev;
+             else 
+                npm start;
+             fi"
+
 
 volumes:
   mongo_data:

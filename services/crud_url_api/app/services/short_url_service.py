@@ -4,11 +4,15 @@ import random
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from fastapi import Depends
 from services.database import get_database_service
+from helpers import get_env_variable
+
+
+DB_URLS_COLLECTION_NAME = get_env_variable("DB_URLS_COLLECTION_NAME")
 
 
 class ShortUrlService:
     def __init__(self, db: AsyncIOMotorDatabase):
-        self.collection = db.get_collection("Urls")
+        self.collection = db.get_collection(DB_URLS_COLLECTION_NAME)
         self.allowed_chars = string.digits + string.ascii_letters
 
     async def generate_short_url(self, owner_id: str) -> str:

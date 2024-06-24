@@ -1,12 +1,12 @@
-import os
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import ConnectionFailure
+from helpers import get_env_variable
 
-DB_USER = os.getenv("DB_USER")
-DB_PASS = os.getenv("DB_PASS")
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", 27017)
-DB_NAME = os.getenv("DB_NAME")
+DB_USER = get_env_variable("DB_CRUD_USER")
+DB_PASS = get_env_variable("DB_CRUD_PASS")
+DB_HOST = get_env_variable("DB_HOST", "localhost")
+DB_PORT = get_env_variable("DB_PORT", 27017)
+DB_NAME = get_env_variable("DB_NAME")
 
 
 class DatabaseService:
@@ -25,7 +25,7 @@ class DatabaseService:
         self.__db_name = db_name
         self.__client = None
         self.__db = None
-        self.__check_connection_interval_s = 100    # seconds
+        # self.__check_connection_interval_s = 100    # seconds
 
         # connection pool config
         # self.__max_pool_size = maxPoolSize         # 100 if not set
