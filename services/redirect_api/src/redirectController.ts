@@ -32,7 +32,7 @@ export async function redirectController(fastify: FastifyInstance, options: any)
             try {
                 const longUrl = await urlService.getLongUrl(shortUrl, req)
                 if (longUrl) {
-                    res.redirect(302, longUrl);
+                    res.redirect(longUrl, 302);
                 } else {
                     res.status(404).send({ error: 'URL not found' });
                 }
