@@ -143,16 +143,25 @@ CI (`.github/workflows/ci.yml`) runs all of this on every push to `dev`, builds 
 
 ## Benchmark
 
-`bench/redirect.sh` runs [autocannon](https://github.com/mcollina/autocannon) inside a container on the stack's network. By default it targets `web:8080/Albert`, a seeded link, which takes the same path as production minus Caddy and oauth2-proxy: nginx → redirect → Valkey. It warms up for 5 s, then runs 30 s at each of 1, 10, 50 and 100 connections. Apart from 3 socket errors in the 1-connection run, every answer was a `302`.
+Two scripts, both run in containers on the stack's network, so no host port forwarding sits in the path. The target is a seeded link (`/Albert`), which takes the production route minus Caddy and oauth2-proxy: nginx → redirect → Valkey. Every answer is checked to be a `302`.
 
-| Connections | Requests | Req/s | p50 | p90 | p99 | max |
+**Latency on one keep-alive connection:** `docker run --rm -i --network nanolink_back nanolink/backend:dev python - < bench/latency.py`. It sends 200 warm-up and 2,000 measured sequential requests.
+
+| Path | Req/s | mean | p50 | p90 | p99 | max |
 |---|---|---|---|---|---|---|
-| 1 | 10,974 | 366 | 15 ms | 29 ms | 49 ms | 75 ms |
-| 10 | 30,207 | 1,007 | 18 ms | 31 ms | 56 ms | 441 ms |
-| 50 | 26,927 | 898 | 38 ms | 87 ms | 370 ms | 1,435 ms |
-| 100 | 22,182 | 739 | 78 ms | 333 ms | 546 ms | 1,474 ms |
+| through nginx (3 runs) | 622–643 | 1.55–1.60 ms | 1.46–1.50 ms | 1.90–2.03 ms | 2.54–3.08 ms | 6.6–8.4 ms |
+| redirect service directly | 744 | 1.34 ms | 1.29 ms | 1.59 ms | 2.17 ms | 12.4 ms |
 
-**Where it ran:** a 2019 MacBook Pro (Intel i9-9980HK, 8 cores) under Docker Desktop, 2026-09-24. The laptop was shared with other build and test workloads (load average ≈ 70), so read these numbers as a floor, not a capacity figure. On the same run, nginx answered its static `/healthz` at only ≈ 2.4–3.5k req/s. The numbers for the demo server will come from the same script, run there.
+**Throughput under concurrency:** `bench/redirect.sh` runs [autocannon](https://github.com/mcollina/autocannon) for 30 s at each level after a 5 s warm-up.
+
+| Connections | Requests | Req/s | Socket errors |
+|---|---|---|---|
+| 1 | 22,649 | 755 | 2 |
+| 10 | 103,764 | 3,459 | 1 |
+| 50 | 65,272 | 2,176 | 0 |
+| 100 | 80,391 | 2,680 | 0 |
+
+**Where it ran:** a 2019 MacBook Pro (Intel i9-9980HK, 8 cores) under Docker Desktop, 2026-09-24 03:45–03:52 UTC. The laptop was shared with other workloads: the load average moved between 6 and 36 during the runs, and throughput varied by up to 3.5× between runs. At 1 and 10 connections autocannon's latency histogram disagreed with its own throughput (Little's law), so latency comes from the sequential script. Treat these as a floor on a busy developer machine; the same scripts will run on the demo server.
 
 ## Repository
 

@@ -20,12 +20,12 @@ load() {
 }
 
 summary_row() {
-  jq -r --arg c "$1" '"| \($c) | \(.requests.total) | \(.requests.average | round) | \(.latency.p50) ms | \(.latency.p90) ms | \(.latency.p99) ms | \(.latency.max) ms | \(.non2xx) | \(.errors + .timeouts) |"'
+  jq -r --arg c "$1" '"| \($c) | \(.requests.total) | \(.requests.average | round) | \(.latency.average) ms | \(.latency.p50) ms | \(.latency.p90) ms | \(.latency.p99) ms | \(.latency.max) ms | \(.errors + .timeouts) |"'
 }
 
 build_load_image
 load 10 5 >/dev/null
-echo "| Connections | Requests | Req/s | p50 | p90 | p99 | max | 3xx/4xx/5xx | errors |"
+echo "| Connections | Requests | Req/s | mean | p50 | p90 | p99 | max | errors |"
 echo "|---|---|---|---|---|---|---|---|---|"
 for connections in 1 10 50 100; do
   load "$connections" "$DURATION_SECONDS" | summary_row "$connections"
