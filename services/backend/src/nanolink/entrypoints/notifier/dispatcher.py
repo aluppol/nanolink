@@ -2,7 +2,6 @@ import asyncio
 import logging
 
 from nats.aio.msg import Msg
-from nats.errors import Error as NatsError
 
 from nanolink.adapters.nats.inbox import JetStreamInbox, is_final_delivery
 from nanolink.adapters.nats.messages import decode_result
@@ -21,7 +20,13 @@ class EmailDispatcher:
 
     async def dispatch_once(self) -> None:
         for message in await self._inbox.next_messages():
+            await self._dispatch_safely(message)
+
+    async def _dispatch_safely(self, message: Msg) -> None:
+        try:
             await self._dispatch(message)
+        except Exception:
+            logger.exception("could not e-mail a result; it will be delivered again")
 
     async def _dispatch(self, message: Msg) -> None:
         result = decode_result(message.data)
@@ -47,6 +52,6 @@ async def dispatch_forever(dispatcher: EmailDispatcher) -> None:
     while True:
         try:
             await dispatcher.dispatch_once()
-        except NatsError:
+        except Exception:
             logger.exception("e-mail dispatch failed; retrying")
             await asyncio.sleep(RETRY_PAUSE_SECONDS)

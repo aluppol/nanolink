@@ -4,7 +4,7 @@ from pathlib import Path
 
 from nats.aio.msg import Msg
 from nats.errors import Error as NatsError
-from pymongo.errors import PyMongoError
+from pymongo.errors import ConnectionFailure, PyMongoError
 
 from nanolink.adapters.nats.inbox import JetStreamInbox, is_final_delivery
 from nanolink.adapters.nats.messages import decode_task
@@ -12,6 +12,7 @@ from nanolink.application.batch_creation import BatchLinkCreation
 from nanolink.domain.errors import DependencyUnavailable
 from nanolink.domain.tasks import CreateLinkTask
 
+TRANSIENT_ERRORS = (ConnectionFailure, NatsError, DependencyUnavailable)
 PROCESSING_ERRORS = (PyMongoError, NatsError, DependencyUnavailable)
 
 logger = logging.getLogger(__name__)
@@ -39,11 +40,28 @@ class CreatorWorker:
             return
         try:
             await self._creation.process([task for _, task in deliveries])
-        except PROCESSING_ERRORS:
-            logger.exception("a batch of %d create tasks failed", len(deliveries))
+        except TRANSIENT_ERRORS:
+            logger.warning("a backing service failed; %d create tasks will be retried", len(deliveries))
             await self._retry_or_abandon(deliveries)
             return
+        except PyMongoError:
+            logger.exception("a batch of %d create tasks failed; retrying them one by one", len(deliveries))
+            await self._isolate(deliveries)
+            return
         await self._inbox.acknowledge([message for message, _ in deliveries])
+
+    async def _isolate(self, deliveries: Sequence[Delivery]) -> None:
+        for delivery in deliveries:
+            await self._handle_alone(delivery)
+
+    async def _handle_alone(self, delivery: Delivery) -> None:
+        message, task = delivery
+        try:
+            await self._creation.process([task])
+        except PROCESSING_ERRORS:
+            await self._retry_or_abandon([delivery])
+            return
+        await self._inbox.acknowledge([message])
 
     async def _retry_or_abandon(self, deliveries: Sequence[Delivery]) -> None:
         final = [(message, task) for message, task in deliveries if is_final_delivery(message)]
