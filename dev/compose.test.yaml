@@ -1,0 +1,15 @@
+services:
+  mongo:
+    networks: [data, egress]
+    ports:
+      - "127.0.0.1:27017:27017"
+
+  queue:
+    networks: [data, egress]
+    ports:
+      - "127.0.0.1:4222:4222"
+
+  cache:
+    networks: [data, egress]
+    ports:
+      - "127.0.0.1:6379:6379"

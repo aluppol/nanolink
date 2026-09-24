@@ -1,0 +1,30 @@
+services:
+  gateway:
+    environment:
+      PUBLIC_BASE_URL: http://127.0.0.1:8088
+      OIDC_ISSUER: http://devauth:8090/realms/dev
+      OIDC_JWKS_URL: http://devauth:8090/realms/dev/protocol/openid-connect/certs
+
+  notifier:
+    environment:
+      PUBLIC_BASE_URL: http://127.0.0.1:8088
+      OIDC_ISSUER: http://devauth:8090/realms/dev
+      OIDC_JWKS_URL: http://devauth:8090/realms/dev/protocol/openid-connect/certs
+
+  devauth:
+    image: ${IMAGE_BACKEND}
+    command: ["python", "/dev-identity/proxy.py"]
+    environment:
+      DEV_ISSUER: http://devauth:8090/realms/dev
+      DEV_UPSTREAM: http://web:8080
+    volumes:
+      - ./identity:/dev-identity:ro
+    networks: [back, egress]
+    ports:
+      - "127.0.0.1:8088:8090"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 96m
+    depends_on:
+      web: {condition: service_healthy}
