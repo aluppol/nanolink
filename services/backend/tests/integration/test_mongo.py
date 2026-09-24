@@ -48,7 +48,9 @@ async def test_a_deleted_link_frees_its_long_url(gateway_database: MongoDatabase
     await links.purge_owned(owner_id)
 
 
-async def test_changing_to_an_owned_long_url_conflicts(gateway_database: MongoDatabase, owner_id: str) -> None:
+async def test_changing_to_an_owned_long_url_conflicts(
+    gateway_database: MongoDatabase, owner_id: str
+) -> None:
     links = MongoLinks(gateway_database)
     first, second = draft(owner_id, "https://example.com/1"), draft(owner_id, "https://example.com/2")
     await links.insert_drafts([first, second])

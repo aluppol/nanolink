@@ -47,4 +47,4 @@ class SmtpEmailSender:
 
 class DisabledEmailSender:
     async def send(self, message: EmailMessage) -> None:
-        logger.info("e-mail delivery is not configured; skipped '%s'", message.subject)
+        logger.debug("e-mail delivery is not configured; skipped '%s'", message.subject)

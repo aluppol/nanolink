@@ -36,4 +36,3 @@ async def migrate_with_retries(settings: MigrateSettings) -> None:
         logger.info("database and streams are up to date")
         return
     raise SystemExit("migrations failed")
-

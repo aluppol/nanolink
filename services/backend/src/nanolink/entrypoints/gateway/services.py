@@ -58,16 +58,15 @@ def assemble_gateway(
     links = MongoLinks(database)
     ledger = MongoTaskLedger(database)
     cache = ValkeyLinkCache(valkey)
+    quota = ValkeyDailyQuota(valkey)
     keys = JwksKeys(http, settings.oidc.jwks_url)
     return GatewayServices(
         verifier=KeycloakTokenVerifier(keys, settings.oidc.issuer, settings.oidc.audience),
-        creation_requests=LinkCreationRequests(
-            JetStreamTaskQueue(nats_client.jetstream()), ledger, ValkeyDailyQuota(valkey)
-        ),
+        creation_requests=LinkCreationRequests(JetStreamTaskQueue(nats_client.jetstream()), ledger, quota),
         task_reports=TaskReports(ledger, links),
         owned_links=OwnedLinkManagement(links, links, cache),
         moderation=LinkModeration(links, links, cache),
-        sandbox=DemoSandbox(links, ledger, cache),
+        sandbox=DemoSandbox(links, ledger, cache, quota),
         readiness=(MongoReadiness(database), NatsReadiness(nats_client)),
         public_base_url=settings.public_base_url,
         demo_reset_token=settings.demo_reset_token,

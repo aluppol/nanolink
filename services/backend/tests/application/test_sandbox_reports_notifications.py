@@ -9,6 +9,7 @@ from tests.support import (
     ALICE,
     BOB,
     GUEST,
+    CountingQuota,
     InMemoryLinks,
     InMemoryTaskLedger,
     RecordingCache,
@@ -21,11 +22,11 @@ ALICE_LINK = LinkDraft("a-1", "Alice1", "https://example.com/a1", ALICE.subject)
 
 
 def sandbox_world() -> tuple[InMemoryLinks, InMemoryTaskLedger, RecordingCache, DemoSandbox]:
-    links, ledger, cache = InMemoryLinks(), InMemoryTaskLedger(), RecordingCache()
+    links, ledger, cache, quota = InMemoryLinks(), InMemoryTaskLedger(), RecordingCache(), CountingQuota(25)
     links.add_active(GUEST_ACTIVE)
     links.add_deleted(GUEST_DELETED)
     links.add_active(ALICE_LINK)
-    return links, ledger, cache, DemoSandbox(links, ledger, cache)
+    return links, ledger, cache, DemoSandbox(links, ledger, cache, quota)
 
 
 async def test_reset_replaces_sandbox_links_with_the_seeds_only() -> None:
@@ -38,6 +39,12 @@ async def test_reset_replaces_sandbox_links_with_the_seeds_only() -> None:
     assert "Alice1" in {link.short_code for link in links.active_links()}
     assert cache.forgotten == {"Guest1", "Guest2"} | set(DEMO_SEED_CODES)
     assert ledger.records == {}
+
+
+async def test_reset_gives_the_sandbox_a_fresh_daily_quota() -> None:
+    links, ledger, cache, quota = InMemoryLinks(), InMemoryTaskLedger(), RecordingCache(), CountingQuota(25)
+    await DemoSandbox(links, ledger, cache, quota).reset()
+    assert await quota.used_today("sandbox") == 0
 
 
 async def test_reset_is_idempotent() -> None:

@@ -26,6 +26,10 @@ class ValkeyDailyQuota:
         with suppress(RedisError):
             await self._client.decr(quota_key(owner_id))
 
+    async def clear(self, owner_id: str) -> None:
+        with suppress(RedisError):
+            await self._client.delete(quota_key(owner_id))
+
     async def used_today(self, owner_id: str) -> int:
         try:
             used = await self._client.get(quota_key(owner_id))

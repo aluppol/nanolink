@@ -26,7 +26,9 @@ async def test_tasks_are_stored_once_per_task_id(jetstream: JetStreamContext, ow
     queue = JetStreamTaskQueue(jetstream)
     await queue.enqueue(task)
     await queue.enqueue(task)
-    subscription = await jetstream.subscribe(task_subject(owner_id), stream=TASK_STREAM, ordered_consumer=True)
+    subscription = await jetstream.subscribe(
+        task_subject(owner_id), stream=TASK_STREAM, ordered_consumer=True
+    )
     first = await subscription.next_msg(timeout=2)
     assert decode_task(first.data) == task
     with pytest.raises(TimeoutError):
@@ -37,14 +39,22 @@ async def test_tasks_are_stored_once_per_task_id(jetstream: JetStreamContext, ow
 async def test_a_batch_creates_links_and_publishes_results(
     gateway_database: MongoDatabase, jetstream: JetStreamContext, owner_id: str
 ) -> None:
-    tasks = [CreateLinkTask(f"task-{uuid.uuid4().hex}", owner_id, f"https://example.com/b{i}", None) for i in range(3)]
+    tasks = [
+        CreateLinkTask(f"task-{uuid.uuid4().hex}", owner_id, f"https://example.com/b{i}", None)
+        for i in range(3)
+    ]
     links = MongoLinks(gateway_database)
     creation = BatchLinkCreation(
-        links, SecretsShortCodeGenerator(), MongoTaskLedger(gateway_database), JetStreamResultPublisher(jetstream)
+        links,
+        SecretsShortCodeGenerator(),
+        MongoTaskLedger(gateway_database),
+        JetStreamResultPublisher(jetstream),
     )
     await creation.process([*tasks, tasks[0]])
     stored = await links.find_by_task_ids([task.task_id for task in tasks])
-    subscription = await jetstream.subscribe(result_subject(owner_id), stream=RESULT_STREAM, ordered_consumer=True)
+    subscription = await jetstream.subscribe(
+        result_subject(owner_id), stream=RESULT_STREAM, ordered_consumer=True
+    )
     results = [decode_result((await subscription.next_msg(timeout=2)).data) for _ in tasks]
     assert set(stored) == {task.task_id for task in tasks}
     assert {result.report.status for result in results if result is not None} == {TaskStatus.CREATED}

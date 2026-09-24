@@ -63,7 +63,7 @@ def services_for(fakes: Fakes, readiness: Readiness) -> GatewayServices:
         task_reports=TaskReports(fakes.ledger, links),
         owned_links=OwnedLinkManagement(links, links, fakes.cache),
         moderation=LinkModeration(links, links, fakes.cache),
-        sandbox=DemoSandbox(links, fakes.ledger, fakes.cache),
+        sandbox=DemoSandbox(links, fakes.ledger, fakes.cache, fakes.quota),
         readiness=(readiness,),
         public_base_url=BASE,
         demo_reset_token=RESET_TOKEN,

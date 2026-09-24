@@ -199,6 +199,9 @@ class CountingQuota:
     async def used_today(self, owner_id: str) -> int:
         return self.used
 
+    async def clear(self, owner_id: str) -> None:
+        self.used = 0
+
 
 class ScriptedCodes:
     def __init__(self, codes: Sequence[str]) -> None:
