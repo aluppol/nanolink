@@ -1,5 +1,6 @@
 import json
 import os
+import secrets
 import time
 from typing import Any
 
@@ -15,7 +16,7 @@ from starlette.background import BackgroundTask
 ISSUER = os.environ["DEV_ISSUER"]
 UPSTREAM = os.environ.get("DEV_UPSTREAM", "http://web:8080")
 AUDIENCE = "nanolink"
-KEY_ID = "nanolink-dev-key"
+KEY_ID = f"nanolink-dev-{secrets.token_hex(6)}"
 USER_COOKIE = "nanolink_dev_user"
 TOKEN_HEADER = "X-Forwarded-Access-Token"
 HOP_BY_HOP = frozenset(
