@@ -24,6 +24,17 @@ def percentile(ordered: list[float], share: float) -> float:
     return ordered[max(int(share * len(ordered)) - 1, 0)]
 
 
+def describe(samples: list[float], elapsed: float) -> str:
+    rate = MEASURED_REQUESTS / elapsed
+    spread = ", ".join(
+        f"p{round(share * 100)} {percentile(samples, share):.2f} ms" for share in (0.5, 0.9, 0.99)
+    )
+    return (
+        f"{MEASURED_REQUESTS} sequential redirects on one connection: {rate:.0f} req/s, "
+        f"mean {statistics.mean(samples):.2f} ms, {spread}, max {samples[-1]:.2f} ms\n"
+    )
+
+
 def main() -> int:
     with httpx.Client(base_url=BASE_URL, follow_redirects=False, timeout=10) as client:
         for _ in range(WARM_UP_REQUESTS):
@@ -31,11 +42,7 @@ def main() -> int:
         started = time.perf_counter()
         samples = sorted(timed_redirect(client) for _ in range(MEASURED_REQUESTS))
         elapsed = time.perf_counter() - started
-    summary = (
-        f"{MEASURED_REQUESTS} sequential redirects on one connection: {MEASURED_REQUESTS / elapsed:.0f} req/s, "
-        f"mean {statistics.mean(samples):.2f} ms, p50 {percentile(samples, 0.5):.2f} ms, "
-        f"p90 {percentile(samples, 0.9):.2f} ms, p99 {percentile(samples, 0.99):.2f} ms, max {samples[-1]:.2f} ms\n"
-    )
+    summary = describe(samples, elapsed)
     sys.stdout.write(summary)
     return 0
 

@@ -61,7 +61,9 @@ async def owner_lifecycle() -> str:
     assert isinstance(link, dict)
     code, link_id = link["short_code"], link["id"]
     assert await redirect_target(alice, code) == (302, long_url)
-    again = await polled_result(alice, (await alice.post("/api/links", json={"long_url": long_url})).json()["task_id"])
+    again = await polled_result(
+        alice, (await alice.post("/api/links", json={"long_url": long_url})).json()["task_id"]
+    )
     assert again["link"]["short_code"] == code, again
     changed = await alice.patch(f"/api/links/{link_id}", json={"long_url": f"{long_url}/changed"})
     assert changed.status_code == 200, changed.text
@@ -102,9 +104,17 @@ async def guest_sandbox() -> str:
 
 async def input_rules() -> str:
     alice = await signed_in("alice")
-    for bad_url in ("http://localhost/", "http://169.254.169.254/latest", "javascript:alert(1)", "http://mongo:27017/"):
+    for bad_url in (
+        "http://localhost/",
+        "http://169.254.169.254/latest",
+        "javascript:alert(1)",
+        "http://mongo:27017/",
+    ):
         answer = await alice.post("/api/links", json={"long_url": bad_url})
-        assert (answer.status_code, answer.json()["error"]) == (422, "invalid_long_url"), (bad_url, answer.text)
+        assert (answer.status_code, answer.json()["error"]) == (422, "invalid_long_url"), (
+            bad_url,
+            answer.text,
+        )
     await alice.aclose()
     return "private, internal and non-http destinations are refused"
 

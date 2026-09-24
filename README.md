@@ -173,7 +173,7 @@ services/queue      NATS JetStream configuration
 services/cache      Valkey start script
 deploy/             production compose file, image list, secret names, smoke checks
 dev/                local override, development sign-in proxy, end-to-end check
-bench/              redirect benchmark
+bench/              latency.py (one connection) and redirect.sh (autocannon)
 .github/workflows   ci.yml (dev), deploy.yml (main → demo server)
 ```
 

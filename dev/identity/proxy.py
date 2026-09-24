@@ -20,15 +20,32 @@ KEY_ID = f"nanolink-dev-{secrets.token_hex(6)}"
 USER_COOKIE = "nanolink_dev_user"
 TOKEN_HEADER = "x-forwarded-access-token"
 HOP_BY_HOP = frozenset(
-    {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding",
-     "upgrade", "host"}
+    {
+        "connection",
+        "keep-alive",
+        "proxy-authenticate",
+        "proxy-authorization",
+        "te",
+        "trailer",
+        "transfer-encoding",
+        "upgrade",
+        "host",
+    }
 )
 NOT_FORWARDED = HOP_BY_HOP | {TOKEN_HEADER}
 DEV_USERS: dict[str, dict[str, Any]] = {
     "alice": {"sub": "0b7d4c1e-0000-4000-8000-00000000a11c", "roles": ["USER"], "email": "alice@example.org"},
     "bob": {"sub": "0b7d4c1e-0000-4000-8000-000000000b0b", "roles": ["USER"], "email": "bob@example.org"},
-    "admin": {"sub": "0b7d4c1e-0000-4000-8000-00000000ad31", "roles": ["ADMIN"], "email": "admin@example.org"},
-    "guest": {"sub": "0b7d4c1e-0000-4000-8000-00000000c0e5", "roles": ["guest"], "email": "guest@example.org"},
+    "admin": {
+        "sub": "0b7d4c1e-0000-4000-8000-00000000ad31",
+        "roles": ["ADMIN"],
+        "email": "admin@example.org",
+    },
+    "guest": {
+        "sub": "0b7d4c1e-0000-4000-8000-00000000c0e5",
+        "roles": ["guest"],
+        "email": "guest@example.org",
+    },
 }
 SIGNING_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
@@ -62,9 +79,13 @@ async def signing_keys() -> JSONResponse:
 
 @app.get("/__dev/login")
 async def choose_user() -> HTMLResponse:
-    links = "".join(f'<li><a href="/__dev/login/{name}">{name}</a> ({", ".join(user["roles"])})</li>'
-                    for name, user in DEV_USERS.items())
-    return HTMLResponse(f"<!doctype html><title>NanoLink dev sign-in</title><h1>Sign in as</h1><ul>{links}</ul>")
+    links = "".join(
+        f'<li><a href="/__dev/login/{name}">{name}</a> ({", ".join(user["roles"])})</li>'
+        for name, user in DEV_USERS.items()
+    )
+    return HTMLResponse(
+        f"<!doctype html><title>NanoLink dev sign-in</title><h1>Sign in as</h1><ul>{links}</ul>"
+    )
 
 
 @app.get("/__dev/login/{username}")
@@ -88,7 +109,9 @@ async def forward(request: Request, path: str) -> Response:
     username = request.cookies.get(USER_COOKIE)
     if username not in DEV_USERS:
         return signed_out_answer(path)
-    headers = {name.lower(): value for name, value in request.headers.items() if name.lower() not in NOT_FORWARDED}
+    headers = {
+        name.lower(): value for name, value in request.headers.items() if name.lower() not in NOT_FORWARDED
+    }
     headers.setdefault("accept-encoding", "identity")
     headers[TOKEN_HEADER] = access_token(username)
     outgoing = upstream.build_request(
@@ -97,7 +120,10 @@ async def forward(request: Request, path: str) -> Response:
     answer = await upstream.send(outgoing, stream=True)
     passed = {name: value for name, value in answer.headers.items() if name.lower() not in HOP_BY_HOP}
     return StreamingResponse(
-        answer.aiter_raw(), status_code=answer.status_code, headers=passed, background=BackgroundTask(answer.aclose)
+        answer.aiter_raw(),
+        status_code=answer.status_code,
+        headers=passed,
+        background=BackgroundTask(answer.aclose),
     )
 
 

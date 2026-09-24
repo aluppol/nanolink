@@ -42,6 +42,12 @@ jobs:
         run: mypy
       - name: House rules (no comments, functions of at most 30 lines)
         run: python scripts/check_house_rules.py
+      - name: The same gates for the scripts in dev/, deploy/ and bench/
+        working-directory: .
+        run: |
+          ruff format --check dev deploy bench
+          ruff check --output-format github dev deploy bench
+          python services/backend/scripts/check_house_rules.py dev deploy bench
       - name: Contract tests
         run: pytest
       - name: Known advisories

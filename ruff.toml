@@ -1,0 +1,5 @@
+extend = "services/backend/pyproject.toml"
+
+[lint.per-file-ignores]
+"dev/e2e.py" = ["S101"]
+"dev/identity/proxy.py" = ["S105"]
