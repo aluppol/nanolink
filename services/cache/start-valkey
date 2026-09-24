@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+: "${VALKEY_PASSWORD:?VALKEY_PASSWORD must be set}"
+exec valkey-server - \
+  --port 6379 \
+  --maxmemory 32mb \
+  --maxmemory-policy allkeys-lru \
+  --save "" \
+  --appendonly no <<CONFIG
+requirepass ${VALKEY_PASSWORD}
+CONFIG
