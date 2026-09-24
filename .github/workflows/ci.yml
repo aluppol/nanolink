@@ -1,0 +1,198 @@
+name: ci
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-redirect-api:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: services/redirect_api
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+      - name: Install (no lockfile is committed yet)
+        run: npm install --no-audit --no-fund
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Build
+        run: npm run build
+
+  test-crud-api:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: services/crud_url_api
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Dependency consistency
+        run: python -m pip check
+
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      images: ${{ steps.images.outputs.images }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read deploy/images.json
+        id: images
+        run: |
+          if [ ! -f deploy/images.json ]; then
+            echo "::error file=deploy/images.json,title=deploy contract::deploy/images.json is missing; see context.md §9 → Release flow"
+            exit 1
+          fi
+          if ! jq -e 'type == "array" and length > 0
+              and all(.[]; (.name | type == "string" and test("^[a-z0-9][a-z0-9-]*$"))
+                and (.context | type == "string") and (.dockerfile | type == "string"))
+              and ([.[].name] | length == (unique | length))' deploy/images.json > /dev/null; then
+            echo "::error file=deploy/images.json,title=deploy contract::must be a non-empty array of {name, context, dockerfile} with unique names matching ^[a-z0-9][a-z0-9-]*$"
+            exit 1
+          fi
+          echo "images=$(jq -c . deploy/images.json)" >> "$GITHUB_OUTPUT"
+
+  images:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.plan.outputs.images) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - if: github.event_name != 'pull_request'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ matrix.image.name }}
+          tags: type=sha,format=long,prefix=sha-
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.dockerfile }}
+          platforms: linux/amd64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}
+
+  stack:
+    needs: [plan, images]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+    env:
+      COMPOSE_FILE: deploy/compose.yaml
+      COMPOSE_PROJECT_NAME: ci
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Point the stack at this commit's images
+        run: |
+          jq -r --arg repo "$GITHUB_REPOSITORY" --arg sha "$GITHUB_SHA" \
+            '.[] | "IMAGE_\(.name | ascii_upcase | gsub("-"; "_"))=ghcr.io/\($repo)/\(.name):sha-\($sha)"' \
+            deploy/images.json > "$RUNNER_TEMP/images.env"
+          cat "$RUNNER_TEMP/images.env"
+          echo "IMAGES_ENV=$RUNNER_TEMP/images.env" >> "$GITHUB_ENV"
+      - name: Generate throwaway secrets from deploy/env.example
+        run: |
+          umask 077
+          invalid=$(grep -vE '^[[:space:]]*(#.*)?$' deploy/env.example | grep -vE '^[A-Z][A-Z0-9_]*=__GENERATE__$' || true)
+          if [ -n "$invalid" ]; then
+            echo "::error file=deploy/env.example,title=deploy contract::only NAME=__GENERATE__ lines (and comments) are allowed; put non-secret settings in compose environment:"
+            exit 1
+          fi
+          : > deploy/.env
+          grep -E '^[A-Z][A-Z0-9_]*=__GENERATE__$' deploy/env.example | cut -d= -f1 | while read -r name; do
+            printf '%s=%s\n' "$name" "$(openssl rand -hex 32)" >> deploy/.env
+          done
+      - name: Create the external networks (on the server the gateway owns them)
+        run: |
+          docker compose --env-file "$IMAGES_ENV" config --format json \
+            | jq -r '(.networks // {}) | to_entries[] | select(.value.external == true) | .value.name' \
+            | while read -r network; do docker network create "$network"; done
+      - name: Start the stack and wait until healthy
+        run: docker compose --env-file "$IMAGES_ENV" up --detach --wait --wait-timeout 300
+      - name: Smoke test (deploy/smoke.sh, when present)
+        run: |
+          if [ -x deploy/smoke.sh ]; then deploy/smoke.sh; else echo "no deploy/smoke.sh"; fi
+      - name: Report unhealthy services
+        if: failure()
+        run: |
+          docker compose --env-file "$IMAGES_ENV" ps --all
+          docker compose --env-file "$IMAGES_ENV" ps --all --format json \
+            | jq -rs 'flatten | .[] | select((.State == "exited" and .ExitCode == 0) | not)
+                | select(.State != "running" or (.Health != "" and .Health != "healthy")) | .Service' \
+            | while read -r service; do
+                tail=$(docker compose --env-file "$IMAGES_ENV" logs --no-color --tail 30 "$service" 2>&1 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+                echo "::error title=stack: ${service} not healthy::${tail}"
+              done
+      - name: Stop the stack
+        if: always()
+        run: docker compose --env-file "$IMAGES_ENV" down --volumes --remove-orphans || true
+
+  ci-ok:
+    if: always()
+    needs: [test-redirect-api, test-crud-api, plan, images, stack]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Every job passed (stack is skipped only on pull requests)
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$RESULTS" | jq -e 'all(.[]; .result == "success" or .result == "skipped")' > /dev/null

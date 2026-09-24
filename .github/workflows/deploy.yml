@@ -1,0 +1,139 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: deploy-demo
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: demo
+      url: ${{ vars.APP_URL }}
+    permissions:
+      contents: read
+      packages: read
+      id-token: write
+    steps:
+      - name: Check that the server half is wired
+        env:
+          TS_CLIENT_ID: ${{ vars.TS_CLIENT_ID }}
+          TS_AUDIENCE: ${{ vars.TS_AUDIENCE }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          missing=""
+          for name in TS_CLIENT_ID TS_AUDIENCE DEPLOY_HOST DEPLOY_KNOWN_HOSTS APP_URL; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error title=deploy not wired::environment demo lacks:$missing; the server half is not finished (context.md §9 → Release flow)"
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve this commit's tested images to digests
+        run: |
+          echo '{}' > "$RUNNER_TEMP/images.json"
+          for name in $(jq -r '.[].name' deploy/images.json); do
+            ref="ghcr.io/${GITHUB_REPOSITORY}/${name}"
+            digest=$(docker buildx imagetools inspect "${ref}:sha-${GITHUB_SHA}" --format '{{json .Manifest}}' | jq -r .digest) || digest=""
+            if ! [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "::error title=image missing::${ref}:sha-${GITHUB_SHA} not found; main may only receive commits whose ci-ok passed on dev"
+              exit 1
+            fi
+            variable="IMAGE_$(printf '%s' "$name" | tr '[:lower:]-' '[:upper:]_')"
+            jq --arg key "$variable" --arg ref "${ref}@${digest}" '. + {($key): $ref}' "$RUNNER_TEMP/images.json" > "$RUNNER_TEMP/images.next"
+            mv "$RUNNER_TEMP/images.next" "$RUNNER_TEMP/images.json"
+          done
+          jq . "$RUNNER_TEMP/images.json"
+      - name: Pack the deploy bundle
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          umask 077
+          jq -n \
+            --arg sha "$GITHUB_SHA" \
+            --rawfile compose deploy/compose.yaml \
+            --rawfile env_example deploy/env.example \
+            --slurpfile images "$RUNNER_TEMP/images.json" \
+            '{sha: $sha, compose: $compose, env_example: $env_example, images: $images[0], registry_token: $ENV.REGISTRY_TOKEN}' \
+            > "$RUNNER_TEMP/bundle.json"
+          jq '{sha, images, compose_bytes: (.compose | length)}' "$RUNNER_TEMP/bundle.json"
+      - name: Join the tailnet (ephemeral node, tag:ci-deploy)
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        with:
+          oauth-client-id: ${{ vars.TS_CLIENT_ID }}
+          audience: ${{ vars.TS_AUDIENCE }}
+          tags: tag:ci-deploy
+          ping: ${{ vars.DEPLOY_HOST }}
+      - name: Deploy on demo-server
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$RUNNER_TEMP/deploy_key"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$RUNNER_TEMP/known_hosts"
+          set +e
+          ssh -i "$RUNNER_TEMP/deploy_key" \
+            -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=20 \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/known_hosts" \
+            "deploy@${DEPLOY_HOST}" deploy < "$RUNNER_TEMP/bundle.json" 2>&1 | tee "$RUNNER_TEMP/deploy.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          rm -f "$RUNNER_TEMP/deploy_key" "$RUNNER_TEMP/bundle.json"
+          if [ "$status" -ne 0 ]; then
+            echo "::error title=deploy failed on demo-server::$(tail -n 40 "$RUNNER_TEMP/deploy.log" | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"
+            exit "$status"
+          fi
+      - name: Check the public edge (a 302 into the login)
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          if ! result=$(curl -sS -o /dev/null --max-time 20 -w '%{http_code} %{redirect_url}' "${APP_URL}/" 2>&1); then
+            echo "::error title=edge check::${APP_URL}/ unreachable: ${result}"
+            exit 1
+          fi
+          echo "${APP_URL}/ -> ${result}"
+          case "$result" in
+            "302 https://auth.luppol.com/realms/luppol/"* | "302 ${APP_URL}/oauth2/"*) ;;
+            *)
+              echo "::error title=edge check::${APP_URL}/ answered '${result}', expected a 302 into the login"
+              exit 1
+              ;;
+          esac
+      - name: Summary
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          {
+            echo "### Deployed \`${GITHUB_SHA}\` to ${APP_URL}"
+            echo '```'
+            jq -r 'to_entries[] | "\(.key)=\(.value)"' "$RUNNER_TEMP/images.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove the key and the bundle
+        if: always()
+        run: rm -f "$RUNNER_TEMP/deploy_key" "$RUNNER_TEMP/bundle.json"
