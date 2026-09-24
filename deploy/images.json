@@ -1,0 +1,7 @@
+[
+  {"name": "web", "context": "services/web", "dockerfile": "services/web/Dockerfile"},
+  {"name": "backend", "context": "services/backend", "dockerfile": "services/backend/Dockerfile"},
+  {"name": "redirect", "context": "services/redirect", "dockerfile": "services/redirect/Dockerfile"},
+  {"name": "queue", "context": "services/queue", "dockerfile": "services/queue/Dockerfile"},
+  {"name": "cache", "context": "services/cache", "dockerfile": "services/cache/Dockerfile"}
+]

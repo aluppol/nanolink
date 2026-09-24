@@ -1,0 +1,199 @@
+name: nanolink
+
+x-hardened: &hardened
+  restart: unless-stopped
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  read_only: true
+  tmpfs: ["/tmp:size=16m,mode=1777"]
+  pids_limit: 128
+  env_file: .env
+
+x-backend-settings: &backend-settings
+  MONGO_HOST: mongo
+  MONGO_PORT: "27017"
+  MONGO_DATABASE: nanolink
+  NATS_URL: nats://queue:4222
+  NATS_USER: nanolink
+  VALKEY_HOST: cache
+  VALKEY_PORT: "6379"
+  PUBLIC_BASE_URL: https://nanolink.luppol.com
+  OIDC_ISSUER: https://auth.luppol.com/realms/luppol
+  OIDC_AUDIENCE: nanolink
+  OIDC_JWKS_URL: https://auth.luppol.com/realms/luppol/protocol/openid-connect/certs
+  LOG_LEVEL: info
+
+x-http-probe: &http-probe
+  test: ["CMD", "python", "-m", "nanolink.entrypoints.http_probe"]
+  interval: 10s
+  timeout: 5s
+  retries: 6
+  start_period: 20s
+
+services:
+  web:
+    <<: *hardened
+    image: ${IMAGE_WEB}
+    networks: [back, edge]
+    mem_limit: 32m
+    depends_on:
+      gateway: {condition: service_healthy}
+      notifier: {condition: service_healthy}
+      redirect: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  gateway:
+    <<: *hardened
+    image: ${IMAGE_BACKEND}
+    command: ["python", "-m", "nanolink.entrypoints.gateway"]
+    environment:
+      <<: *backend-settings
+      MONGO_USERNAME: gateway
+      PORT: "8000"
+    networks: [edge, data, egress]
+    mem_limit: 128m
+    depends_on:
+      migrate: {condition: service_healthy}
+      cache: {condition: service_healthy}
+    healthcheck: *http-probe
+
+  creator:
+    <<: *hardened
+    image: ${IMAGE_BACKEND}
+    command: ["python", "-m", "nanolink.entrypoints.creator"]
+    environment:
+      <<: *backend-settings
+      MONGO_USERNAME: creator
+      HEARTBEAT_FILE: /tmp/creator-heartbeat
+    networks: [data]
+    mem_limit: 96m
+    depends_on:
+      migrate: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-m", "nanolink.entrypoints.heartbeat_probe"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  notifier:
+    <<: *hardened
+    image: ${IMAGE_BACKEND}
+    command: ["python", "-m", "nanolink.entrypoints.notifier"]
+    environment:
+      <<: *backend-settings
+      PORT: "8000"
+    networks: [edge, data, egress]
+    mem_limit: 96m
+    depends_on:
+      migrate: {condition: service_healthy}
+    healthcheck: *http-probe
+
+  migrate:
+    <<: *hardened
+    image: ${IMAGE_BACKEND}
+    command: ["python", "-m", "nanolink.entrypoints.migrate.then_idle"]
+    environment:
+      <<: *backend-settings
+      MONGO_INITDB_ROOT_USERNAME: root
+      MIGRATED_FILE: /tmp/migrated
+    networks: [data]
+    mem_limit: 96m
+    depends_on:
+      mongo: {condition: service_healthy}
+      queue: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/migrated"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+
+  redirect:
+    <<: *hardened
+    image: ${IMAGE_REDIRECT}
+    environment:
+      PORT: "8080"
+      MONGO_HOST: mongo
+      MONGO_PORT: "27017"
+      MONGO_DATABASE: nanolink
+      MONGO_USERNAME: redirect
+      VALKEY_HOST: cache
+      VALKEY_PORT: "6379"
+      LOG_LEVEL: warn
+    networks: [edge, data]
+    mem_limit: 128m
+    depends_on:
+      migrate: {condition: service_healthy}
+      cache: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "node", "dist/healthcheck.js"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  mongo:
+    <<: *hardened
+    image: mongo:7.0@sha256:9854f7139445d766a9523571d6f047530c45547460ffcf8259eb2bf4264632ca
+    user: "999:999"
+    command: ["mongod", "--wiredTigerCacheSizeGB", "0.25", "--bind_ip_all"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+    volumes:
+      - mongo:/data/db
+      - mongo-config:/data/configdb
+    networks: [data]
+    mem_limit: 448m
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --host \"$$(hostname -i)\" --eval 'quit(db.runCommand({ping: 1}).ok ? 0 : 1)'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  queue:
+    <<: *hardened
+    image: ${IMAGE_QUEUE}
+    environment:
+      NATS_USER: nanolink
+      GOMEMLIMIT: 48MiB
+    volumes:
+      - queue:/data
+    networks: [data]
+    mem_limit: 64m
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8222/healthz?js-enabled-only=true"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  cache:
+    <<: *hardened
+    image: ${IMAGE_CACHE}
+    networks: [data]
+    mem_limit: 48m
+    healthcheck:
+      test: ["CMD", "valkey-health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+networks:
+  back:
+    external: true
+    name: nanolink_back
+  edge:
+    internal: true
+  data:
+    internal: true
+  egress: {}
+
+volumes:
+  mongo: {}
+  mongo-config: {}
+  queue: {}
