@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+
+if [ -z "${DEMO_RESET_TOKEN:-}" ]; then
+  echo "demo-reset: DEMO_RESET_TOKEN is not set" >&2
+  exit 1
+fi
+
+answer=$(wget -q -O - -T 60 \
+  --header "X-Demo-Reset-Token: ${DEMO_RESET_TOKEN}" \
+  --post-data '' \
+  http://gateway:8000/internal/demo-reset) || {
+  echo "demo-reset: the gateway did not complete the reset" >&2
+  exit 1
+}
+
+printf '%s\n' "$answer"
