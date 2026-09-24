@@ -74,11 +74,18 @@ def unsigned_token() -> str:
 @dataclass
 class JwksServer:
     status: int = 200
+    keys_served: bool = True
     requests: list[str] = field(default_factory=list)
 
     def handle(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(str(request.url))
-        return httpx.Response(self.status, json=jwks_document())
+        document = jwks_document() if self.keys_served else {"keys": [unrelated_key()]}
+        return httpx.Response(self.status, json=document)
+
+
+def unrelated_key() -> dict[str, Any]:
+    public_jwk = json.loads(RSAAlgorithm.to_jwk(FOREIGN_KEY.public_key()))
+    return {**public_jwk, "kid": "key-rotated", "use": "sig", "alg": "RS256"}
 
 
 def verifier_for(server: JwksServer, clock: list[float] | None = None) -> KeycloakTokenVerifier:
@@ -147,6 +154,16 @@ async def test_keys_are_fetched_once_and_refreshed_at_most_every_thirty_seconds(
     await outcome_of(verifier, signed(claims(), key_id="key-2"))
     clock[0] = 31.0
     await outcome_of(verifier, signed(claims(), key_id="key-2"))
+    assert len(server.requests) == 2
+
+
+async def test_a_key_removed_from_the_endpoint_stops_working_within_ten_minutes() -> None:
+    server, clock = JwksServer(), [0.0]
+    verifier = verifier_for(server, clock)
+    assert await outcome_of(verifier, signed(claims())) == ALICE
+    server.keys_served = False
+    clock[0] = 601.0
+    assert await outcome_of(verifier, signed(claims())) == NotAuthenticated
     assert len(server.requests) == 2
 
 
