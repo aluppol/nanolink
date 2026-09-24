@@ -7,6 +7,13 @@ Nine hardened containers, all non-root and read-only, run within a 1.25 GB memor
 - **Status:** feature-complete and tested locally and in CI. Deployment to `https://nanolink.luppol.com` (demo server, guest login) waits for the server side of the pipeline.
 - **Source:** [github.com/aluppol/nanolink](https://github.com/aluppol/nanolink) · License: AGPL-3.0
 
+<p>
+  <img src="docs/screenshots/ui-guest.jpg" alt="NanoLink signed in as the shared guest account: sandbox banner, the shorten form and the seeded links" width="68%">
+  <img src="docs/screenshots/ui-mobile.jpg" alt="NanoLink on a narrow screen: the shorten form and a user's links" width="28%">
+</p>
+
+*The UI from a local run, signed in as the guest (left) and as a user on a narrow screen (right).*
+
 ## Architecture
 
 ```mermaid
