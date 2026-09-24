@@ -1,9 +1,18 @@
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from nanolink.application.batch_creation import BatchLinkCreation
 from nanolink.domain import long_urls
+from nanolink.domain.errors import DependencyUnavailable
 from nanolink.domain.links import LinkDraft
-from nanolink.domain.tasks import CREATION_ABANDONED, SHORT_CODES_EXHAUSTED, CreateLinkTask
+from nanolink.domain.tasks import (
+    CREATION_ABANDONED,
+    INVALID_OWNER,
+    SHORT_CODES_EXHAUSTED,
+    CreateLinkTask,
+    TaskReport,
+    TaskStatus,
+)
 from tests.support import (
     ALICE,
     BOB,
@@ -19,6 +28,7 @@ TASK_A = CreateLinkTask("task-a", ALICE.subject, URL_A, ALICE.email)
 TASK_A_TWIN = CreateLinkTask("task-a-twin", ALICE.subject, URL_A, ALICE.email)
 TASK_B = CreateLinkTask("task-b", BOB.subject, URL_A, BOB.email)
 TASK_LOCAL = CreateLinkTask("task-local", ALICE.subject, "http://localhost/admin", ALICE.email)
+TASK_BAD_OWNER = CreateLinkTask("task-bad-owner", "not.an owner", URL_A, None)
 
 Outcome = tuple[str, str]
 
@@ -103,6 +113,13 @@ CASES = [
         {"task-a": ("created", "Code01")},
         results=1,
     ),
+    Case(
+        "a malformed owner fails without an insert",
+        (TASK_BAD_OWNER,),
+        (),
+        {"task-bad-owner": ("failed", INVALID_OWNER)},
+        inserts=0,
+    ),
 ]
 
 
@@ -143,10 +160,23 @@ async def test_results_carry_the_address_to_notify() -> None:
 
 
 async def test_abandoned_tasks_are_reported_as_failed() -> None:
-    results = RecordingResults()
-    creation = BatchLinkCreation(InMemoryLinks(), ScriptedCodes(()), InMemoryTaskLedger(), results)
+    results, ledger = RecordingResults(), InMemoryTaskLedger()
+    creation = BatchLinkCreation(InMemoryLinks(), ScriptedCodes(()), ledger, results)
     await creation.abandon([TASK_A, TASK_A, TASK_B])
     assert [(result.report.task_id, result.report.failure) for result in results.results] == [
         ("task-a", CREATION_ABANDONED),
         ("task-b", CREATION_ABANDONED),
     ]
+    assert {record.status for record in ledger.records.values()} == {TaskStatus.FAILED}
+
+
+class UnavailableLedger(InMemoryTaskLedger):
+    async def record_reports(self, reports: Sequence[TaskReport]) -> None:
+        raise DependencyUnavailable
+
+
+async def test_abandoning_still_notifies_when_the_ledger_is_down() -> None:
+    results = RecordingResults()
+    creation = BatchLinkCreation(InMemoryLinks(), ScriptedCodes(()), UnavailableLedger(), results)
+    await creation.abandon([TASK_A])
+    assert [result.report.task_id for result in results.results] == ["task-a"]

@@ -6,6 +6,7 @@ from nanolink.domain.links import Link
 
 SHORT_CODES_EXHAUSTED = "no free short code was found; please try again"
 CREATION_ABANDONED = "the link could not be created; please try again later"
+INVALID_OWNER = "the request does not name a valid owner"
 
 
 class TaskStatus(StrEnum):

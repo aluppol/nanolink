@@ -2,9 +2,11 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from pymongo import UpdateOne
+from pymongo.errors import PyMongoError
 
 from nanolink.adapters.mongo.connection import TASKS_COLLECTION, MongoDatabase, server_time
 from nanolink.adapters.mongo.documents import report_fields, task_record_from_document
+from nanolink.domain.errors import DependencyUnavailable
 from nanolink.domain.tasks import CreateLinkTask, TaskRecord, TaskReport, TaskStatus
 
 
@@ -28,8 +30,11 @@ class MongoTaskLedger:
     async def record_reports(self, reports: Sequence[TaskReport]) -> None:
         if not reports:
             return
-        now = await server_time(self._database)
-        await self._tasks.bulk_write([_report_upsert(report, now) for report in reports], ordered=False)
+        try:
+            now = await server_time(self._database)
+            await self._tasks.bulk_write([_report_upsert(report, now) for report in reports], ordered=False)
+        except PyMongoError as error:
+            raise DependencyUnavailable from error
 
     async def find_owned(self, task_id: str, owner_id: str) -> TaskRecord | None:
         document = await self._tasks.find_one({"_id": task_id, "owner_id": owner_id})
