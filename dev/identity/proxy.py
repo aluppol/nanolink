@@ -88,6 +88,7 @@ async def forward(request: Request, path: str) -> Response:
     if username not in DEV_USERS:
         return signed_out_answer(path)
     headers = {name: value for name, value in request.headers.items() if name.lower() not in HOP_BY_HOP}
+    headers.setdefault("accept-encoding", "identity")
     headers[TOKEN_HEADER] = access_token(username)
     outgoing = upstream.build_request(
         request.method, f"/{path}", params=request.query_params, headers=headers, content=await request.body()
