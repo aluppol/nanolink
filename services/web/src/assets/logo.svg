@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="NanoLink">
+  <rect width="32" height="32" rx="9" fill="#4b44d8"/>
+  <g fill="none" stroke="#ffffff" stroke-width="2.6" transform="rotate(-45 16 16)">
+    <rect x="5" y="11.75" width="13" height="8.5" rx="4.25"/>
+    <rect x="14" y="11.75" width="13" height="8.5" rx="4.25"/>
+  </g>
+</svg>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>NanoLink</title>
+    <meta name="description" content="NanoLink is a URL shortener with a queued create pipeline, live results over Server-Sent Events and a cached redirect path.">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0e1014" media="(prefers-color-scheme: dark)">
+    <link rel="icon" type="image/svg+xml" href="/assets/{{logo.svg}}">
+    <link rel="stylesheet" href="/assets/{{app.css}}">
+    <script type="module" src="/assets/{{app.js}}"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="/" aria-label="NanoLink home">
+          <img class="brand-mark" src="/assets/{{logo.svg}}" alt="" width="28" height="28">
+          <span class="brand-name">NanoLink</span>
+        </a>
+        <div id="account" class="account"></div>
+      </div>
+    </header>
+    <div id="session-banner" class="container banner-slot"></div>
+    <main id="main" class="container main" tabindex="-1">
+      <div id="guest-banner" class="banner-slot"></div>
+      <section class="card create-card" aria-labelledby="create-title">
+        <h1 id="create-title" class="card-title">Shorten a link</h1>
+        <p class="lede">Paste a long URL. Creation runs through a queue, and the short link appears here as soon as it is ready.</p>
+        <form id="create-form" class="create-form" novalidate>
+          <label class="field-label" for="long-url">Long URL</label>
+          <div class="field-row">
+            <input id="long-url" class="text-input" name="long_url" type="url" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://example.com/a/very/long/path" aria-describedby="long-url-problem long-url-hint" required>
+            <button id="create-submit" class="button button-primary" type="submit">Shorten</button>
+          </div>
+          <p id="long-url-problem" class="field-problem" role="alert" hidden></p>
+          <p id="long-url-hint" class="field-hint">
+            <span>NanoLink never visits the address you submit; it only checks the format.</span>
+            <span id="quota-hint" class="quota-hint"></span>
+          </p>
+        </form>
+      </section>
+      <section class="pending-section" aria-label="Links being created">
+        <ul id="pending-list" class="pending-list"></ul>
+      </section>
+      <section class="card links-card" aria-labelledby="links-title">
+        <div class="links-head">
+          <h2 id="links-title" class="card-title">Your links</h2>
+          <div id="view-tabs" class="view-tabs"></div>
+        </div>
+        <div id="link-panels"></div>
+      </section>
+      <details class="card how-card">
+        <summary>How NanoLink works</summary>
+        <ol class="how-steps">
+          <li>The API gateway checks your sign-in token and daily quota, queues the request and answers <code>202 Accepted</code> right away.</li>
+          <li>NATS JetStream keeps the task on disk, on a subject partitioned by user.</li>
+          <li>The creator service pulls tasks in batches and writes the links to MongoDB.</li>
+          <li>The notifier pushes each result to this page over Server-Sent Events.</li>
+          <li>Opening a short link reaches the redirect service, which reads through a Valkey cache and falls back to MongoDB.</li>
+        </ol>
+        <p class="how-more"><a href="https://github.com/aluppol/nanolink#readme">Architecture notes and source on GitHub</a></p>
+      </details>
+    </main>
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <span>NanoLink</span>
+        <span aria-hidden="true">·</span>
+        <a href="https://github.com/aluppol/nanolink">source on GitHub</a>
+        <span aria-hidden="true">·</span>
+        <span>AGPL-3.0</span>
+      </div>
+    </footer>
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+    <div id="live-region" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+    <noscript><p class="noscript">NanoLink needs JavaScript to run.</p></noscript>
+  </body>
+</html>
