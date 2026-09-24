@@ -7,6 +7,7 @@ from nanolink.entrypoints.notifier.events import (
     KEEPALIVE,
     RECONNECT_MILLISECONDS,
     format_result_event,
+    new_listener,
     result_events,
 )
 from nanolink.entrypoints.notifier.feed import LiveFeed
@@ -31,7 +32,6 @@ def test_feed_delivers_only_to_the_owner() -> None:
     feed.detach("alice-0001", alice)
     feed.publish(ALICE_REPORT)
     assert alice.qsize() == 1
-    assert feed.listener_count("alice-0001") == 0
 
 
 def test_a_full_listener_drops_instead_of_blocking() -> None:
@@ -54,12 +54,13 @@ def test_events_use_the_public_link_view() -> None:
 
 
 async def test_a_stream_forwards_results_and_detaches_when_it_ends() -> None:
-    feed = LiveFeed()
-    stream = result_events(feed, "alice-0001", BASE, lifetime_seconds=0.5)
+    feed, listener = LiveFeed(), new_listener()
+    stream = result_events(feed, "alice-0001", BASE, listener, lifetime_seconds=0.5)
     assert await anext(stream) == f"retry: {RECONNECT_MILLISECONDS}\n\n"
     feed.publish(BOB_REPORT)
     feed.publish(ALICE_REPORT)
     assert "task-1" in await anext(stream)
     remaining = [chunk async for chunk in stream]
     assert remaining == [KEEPALIVE]
-    assert feed.listener_count("alice-0001") == 0
+    feed.publish(ALICE_REPORT)
+    assert listener.qsize() == 0

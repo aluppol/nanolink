@@ -21,7 +21,11 @@ class LinkCreationRequests:
         ensure_valid_long_url(long_url)
         await self._consume_quota(principal)
         task = CreateLinkTask(task_id, principal.owner_id, long_url, principal.notify_email)
-        await self._enqueue_or_refund(principal, task)
+        try:
+            await self._queue.enqueue(task)
+        except DependencyUnavailable:
+            await self._refund_quota(principal)
+            raise
         await self._ledger.record_queued(task)
 
     async def used_today(self, principal: Principal) -> int:
@@ -31,10 +35,6 @@ class LinkCreationRequests:
         if principal.daily_quota is not None:
             await self._quota.consume(principal.owner_id, principal.daily_quota)
 
-    async def _enqueue_or_refund(self, principal: Principal, task: CreateLinkTask) -> None:
-        try:
-            await self._queue.enqueue(task)
-        except DependencyUnavailable:
-            if principal.daily_quota is not None:
-                await self._quota.refund(principal.owner_id)
-            raise
+    async def _refund_quota(self, principal: Principal) -> None:
+        if principal.daily_quota is not None:
+            await self._quota.refund(principal.owner_id)

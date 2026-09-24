@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 from nanolink.entrypoints.http_auth import CurrentPrincipal
 from nanolink.entrypoints.http_errors import install_error_handlers
 from nanolink.entrypoints.http_health import router as health_router
-from nanolink.entrypoints.notifier.events import result_events
+from nanolink.entrypoints.notifier.events import new_listener, result_events
 from nanolink.entrypoints.notifier.services import NotifierServices
 
 NotifierServicesOpener = Callable[[], AbstractAsyncContextManager[NotifierServices]]
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api")
 @router.get("/notifications")
 async def stream_notifications(request: Request, principal: CurrentPrincipal) -> StreamingResponse:
     services: NotifierServices = request.app.state.services
-    events = result_events(services.feed, principal.owner_id, services.public_base_url)
+    events = result_events(services.feed, principal.owner_id, services.public_base_url, new_listener())
     return StreamingResponse(events, media_type="text/event-stream", headers=STREAM_HEADERS)
 
 

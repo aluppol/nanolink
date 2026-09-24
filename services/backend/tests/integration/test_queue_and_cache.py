@@ -11,9 +11,9 @@ from nanolink.adapters.nats.connection import RESULT_STREAM, TASK_STREAM, result
 from nanolink.adapters.nats.messages import decode_result, decode_task
 from nanolink.adapters.nats.publishers import JetStreamResultPublisher, JetStreamTaskQueue
 from nanolink.adapters.short_codes import SecretsShortCodeGenerator
-from nanolink.adapters.valkey.connection import link_cache_key
+from nanolink.adapters.valkey.connection import link_cache_key, quota_key
 from nanolink.adapters.valkey.link_cache import ValkeyLinkCache
-from nanolink.adapters.valkey.quota import ValkeyDailyQuota
+from nanolink.adapters.valkey.quota import KEY_LIFETIME_SECONDS, ValkeyDailyQuota, utc_today
 from nanolink.application.batch_creation import BatchLinkCreation
 from nanolink.domain.errors import QuotaExceeded
 from nanolink.domain.tasks import CreateLinkTask, TaskStatus
@@ -62,7 +62,7 @@ async def test_a_batch_creates_links_and_publishes_results(
     await links.purge_owned(owner_id)
 
 
-async def test_the_quota_counts_and_refunds(valkey: Redis, owner_id: str) -> None:
+async def test_the_quota_counts_refunds_and_clears(valkey: Redis, owner_id: str) -> None:
     quota = ValkeyDailyQuota(valkey)
     await quota.consume(owner_id, 2)
     await quota.consume(owner_id, 2)
@@ -71,8 +71,9 @@ async def test_the_quota_counts_and_refunds(valkey: Redis, owner_id: str) -> Non
     assert await quota.used_today(owner_id) == 2
     await quota.refund(owner_id)
     assert await quota.used_today(owner_id) == 1
-    assert 0 < await valkey.ttl(f"quota:{owner_id}") <= 24 * 3600
-    await valkey.delete(f"quota:{owner_id}")
+    assert 0 < await valkey.ttl(quota_key(owner_id, utc_today())) <= KEY_LIFETIME_SECONDS
+    await quota.clear(owner_id)
+    assert await quota.used_today(owner_id) == 0
 
 
 async def test_forgetting_removes_cache_entries(valkey: Redis) -> None:

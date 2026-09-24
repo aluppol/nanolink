@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from datetime import date
 
 from redis.asyncio import Redis
 
@@ -33,5 +34,5 @@ def link_cache_key(short_code: str) -> str:
     return f"link:{short_code}"
 
 
-def quota_key(owner_id: str) -> str:
-    return f"quota:{owner_id}"
+def quota_key(owner_id: str, day: date) -> str:
+    return f"quota:{owner_id}:{day.isoformat()}"

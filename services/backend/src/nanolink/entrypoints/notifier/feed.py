@@ -23,6 +23,3 @@ class LiveFeed:
         for listener in tuple(self._listeners.get(report.owner_id, ())):
             with suppress(asyncio.QueueFull):
                 listener.put_nowait(report)
-
-    def listener_count(self, owner_id: str) -> int:
-        return len(self._listeners.get(owner_id, ()))

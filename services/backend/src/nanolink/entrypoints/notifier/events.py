@@ -13,13 +13,17 @@ RECONNECT_MILLISECONDS = 1000
 KEEPALIVE = ": keepalive\n\n"
 
 
+def new_listener() -> Listener:
+    return asyncio.Queue(maxsize=LISTENER_CAPACITY)
+
+
 async def result_events(
     feed: LiveFeed,
     owner_id: str,
     public_base_url: str,
+    listener: Listener,
     lifetime_seconds: float = STREAM_LIFETIME_SECONDS,
 ) -> AsyncIterator[str]:
-    listener: Listener = asyncio.Queue(maxsize=LISTENER_CAPACITY)
     feed.attach(owner_id, listener)
     loop = asyncio.get_running_loop()
     deadline = loop.time() + lifetime_seconds
