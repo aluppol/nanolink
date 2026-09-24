@@ -64,7 +64,6 @@ logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-package-lock.json
 
 # Runtime data
 pids
@@ -218,3 +217,6 @@ Thumbs.db
 # Dependency directories
 node_modules/
 jspm_packages/
+
+# Agent worktrees
+.claude/
