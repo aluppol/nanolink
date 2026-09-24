@@ -1,0 +1,6 @@
+[
+  {"name": "web", "context": ".", "dockerfile": "deploy/web.Dockerfile"},
+  {"name": "crud-api", "context": ".", "dockerfile": "deploy/crud-api.Dockerfile"},
+  {"name": "redirect-api", "context": ".", "dockerfile": "deploy/redirect-api.Dockerfile"},
+  {"name": "db", "context": ".", "dockerfile": "deploy/db.Dockerfile"}
+]

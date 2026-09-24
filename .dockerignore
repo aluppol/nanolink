@@ -1,0 +1,11 @@
+.git
+.github
+.idea
+docs
+.env
+deploy/.env
+context.md
+**/venv
+**/node_modules
+**/dist
+**/__pycache__

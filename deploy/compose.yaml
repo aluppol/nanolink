@@ -1,0 +1,111 @@
+name: nanolink
+
+services:
+  web:
+    image: ${IMAGE_WEB}
+    depends_on:
+      crud-api:
+        condition: service_healthy
+      redirect-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks: [back, app]
+    mem_limit: 64m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+
+  crud-api:
+    image: ${IMAGE_CRUD_API}
+    environment:
+      DB_HOST: db
+      DB_PORT: "27017"
+      DB_NAME: nanolink
+      DB_CRUD_USER: crud
+      DB_URLS_COLLECTION_NAME: urls
+      JWT_ALGORITHM: RS256
+      JWT_PUBLIC_KEY: ""
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/openapi.json', timeout=2)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks: [app, data, egress]
+    mem_limit: 256m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+
+  redirect-api:
+    image: ${IMAGE_REDIRECT_API}
+    environment:
+      REDIRECT_API_PORT: "3000"
+      DB_HOST: db
+      DB_PORT: "27017"
+      DB_NAME: nanolink
+      DB_REDIRECT_USER: redirect
+      DB_URLS_COLLECTION_NAME: urls
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/ping', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks: [app, data]
+    mem_limit: 192m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+
+  db:
+    image: ${IMAGE_DB}
+    # Starting as mongodb skips the entrypoint's chown/gosu step, which cap_drop ALL would forbid.
+    user: mongodb
+    command: ["--wiredTigerCacheSizeGB", "0.25"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      DB_NAME: nanolink
+      DB_CRUD_USER: crud
+      DB_REDIRECT_USER: redirect
+      DB_URLS_COLLECTION_NAME: urls
+    env_file: .env
+    healthcheck:
+      # Via the container address: the first-start instance listens on 127.0.0.1 only, so this stays red until the real one is up.
+      test: ["CMD-SHELL", "mongosh --quiet --host \"$(hostname -i)\" --eval 'quit(db.adminCommand(\"ping\").ok === 1 ? 0 : 1)'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    volumes:
+      - mongo_data:/data/db
+    networks: [data]
+    mem_limit: 640m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+
+networks:
+  back:
+    external: true
+    name: nanolink_back
+  app:
+    internal: true
+  data:
+    internal: true
+  egress: {}
+
+volumes:
+  mongo_data: {}
