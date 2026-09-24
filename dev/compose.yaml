@@ -18,7 +18,7 @@ services:
       DEV_ISSUER: http://devauth:8090/realms/dev
       DEV_UPSTREAM: http://web:8080
     volumes:
-      - ./identity:/dev-identity:ro
+      - ../dev/identity:/dev-identity:ro
     networks: [back, egress]
     ports:
       - "127.0.0.1:8088:8090"
