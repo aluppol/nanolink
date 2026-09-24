@@ -1,7 +1,6 @@
 from collections.abc import Sequence
 
 from nats.aio.msg import Msg
-from nats.errors import TimeoutError as NatsTimeout
 from nats.js.client import JetStreamContext
 
 MAX_DELIVERIES = 6
@@ -19,7 +18,7 @@ class JetStreamInbox:
     async def next_messages(self) -> list[Msg]:
         try:
             return await self._subscription.fetch(self._batch_size, timeout=self._wait_seconds)
-        except NatsTimeout:
+        except TimeoutError:
             return []
 
     async def acknowledge(self, messages: Sequence[Msg]) -> None:
