@@ -25,8 +25,9 @@ async def polled_result(client: httpx.AsyncClient, task_id: str) -> dict[str, ob
 
 
 async def created_via_stream_and_task(alice: httpx.AsyncClient, long_url: str) -> dict[str, object]:
-    stream = asyncio.create_task(listen_for_any_result(alice))
-    await asyncio.sleep(0.5)
+    listening = asyncio.Event()
+    stream = asyncio.create_task(listen_for_any_result(alice, listening))
+    await asyncio.wait_for(listening.wait(), RESULT_TIMEOUT_SECONDS)
     accepted = await alice.post("/api/links", json={"long_url": long_url})
     assert accepted.status_code == 202, accepted.text
     task_id = accepted.json()["task_id"]
@@ -37,9 +38,11 @@ async def created_via_stream_and_task(alice: httpx.AsyncClient, long_url: str) -
     return polled
 
 
-async def listen_for_any_result(client: httpx.AsyncClient) -> dict[str, object]:
+async def listen_for_any_result(client: httpx.AsyncClient, listening: asyncio.Event) -> dict[str, object]:
     async with client.stream("GET", "/api/notifications", timeout=None) as stream:
         async for line in stream.aiter_lines():
+            if line.startswith("retry:"):
+                listening.set()
             if line.startswith("data: "):
                 return dict(json.loads(line.removeprefix("data: ")))
     raise AssertionError("the notification stream ended early")

@@ -18,11 +18,12 @@ UPSTREAM = os.environ.get("DEV_UPSTREAM", "http://web:8080")
 AUDIENCE = "nanolink"
 KEY_ID = f"nanolink-dev-{secrets.token_hex(6)}"
 USER_COOKIE = "nanolink_dev_user"
-TOKEN_HEADER = "X-Forwarded-Access-Token"
+TOKEN_HEADER = "x-forwarded-access-token"
 HOP_BY_HOP = frozenset(
     {"connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding",
      "upgrade", "host"}
 )
+NOT_FORWARDED = HOP_BY_HOP | {TOKEN_HEADER}
 DEV_USERS: dict[str, dict[str, Any]] = {
     "alice": {"sub": "0b7d4c1e-0000-4000-8000-00000000a11c", "roles": ["USER"], "email": "alice@example.org"},
     "bob": {"sub": "0b7d4c1e-0000-4000-8000-000000000b0b", "roles": ["USER"], "email": "bob@example.org"},
@@ -87,7 +88,7 @@ async def forward(request: Request, path: str) -> Response:
     username = request.cookies.get(USER_COOKIE)
     if username not in DEV_USERS:
         return signed_out_answer(path)
-    headers = {name: value for name, value in request.headers.items() if name.lower() not in HOP_BY_HOP}
+    headers = {name.lower(): value for name, value in request.headers.items() if name.lower() not in NOT_FORWARDED}
     headers.setdefault("accept-encoding", "identity")
     headers[TOKEN_HEADER] = access_token(username)
     outgoing = upstream.build_request(
