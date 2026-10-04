@@ -15,6 +15,7 @@ LABEL org.opencontainers.image.title="nanolink-web" \
       org.opencontainers.image.licenses="AGPL-3.0-only"
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY nginx/security-headers.conf /etc/nginx/snippets/security-headers.conf
+COPY nginx/ui-security-policy.conf /etc/nginx/snippets/ui-security-policy.conf
 COPY --chmod=0755 bin/demo-reset /usr/local/bin/demo-reset
 COPY --from=build /build/dist/ /usr/share/nginx/html/
 RUN nginx -t
