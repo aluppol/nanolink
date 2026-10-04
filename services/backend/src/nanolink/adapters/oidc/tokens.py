@@ -51,7 +51,7 @@ def principal_from_claims(claims: Mapping[str, Any]) -> Principal:
         raise NotAuthorized
     username = _text(claims.get("preferred_username")) or subject
     email = _text(claims.get("email")) if claims.get("email_verified") is True else None
-    return Principal(subject, username, email, roles)
+    return Principal(subject, username, email, roles, _text(claims.get("sid")))
 
 
 def _key_id(token: str) -> str:

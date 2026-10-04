@@ -24,6 +24,10 @@ class QuotaExceeded(NanolinkError):
     pass
 
 
+class SandboxQuotaExceeded(QuotaExceeded):
+    pass
+
+
 class NotAuthenticated(NanolinkError):
     pass
 

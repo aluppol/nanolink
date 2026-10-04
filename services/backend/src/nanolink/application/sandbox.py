@@ -1,5 +1,5 @@
 from nanolink.domain.ports import DailyQuota, LinkCache, SandboxLinks, TaskLedger
-from nanolink.domain.sandbox import DEMO_SEED_CODES, SANDBOX_OWNER_ID, seed_drafts
+from nanolink.domain.sandbox import DEMO_SEED_CODES, SANDBOX_OWNER_ID, SANDBOX_QUOTA_HOLDER, seed_drafts
 
 
 class DemoSandbox:
@@ -18,4 +18,4 @@ class DemoSandbox:
         await self._ledger.purge_owned(SANDBOX_OWNER_ID)
         await self._links.insert_drafts(seed_drafts())
         await self._cache.forget(stale_codes | DEMO_SEED_CODES)
-        await self._quota.clear(SANDBOX_OWNER_ID)
+        await self._quota.clear(SANDBOX_QUOTA_HOLDER)

@@ -121,6 +121,19 @@ CASES: list[tuple[str, str, Expected]] = [
         signed(claims(realm_access={"roles": ["guest"]})),
         Principal("alice-0001", "alice", "alice@example.org", frozenset({Role.GUEST})),
     ),
+    (
+        "the Keycloak session id is kept",
+        signed(claims(sid="2b7f0c3e-5d1a-4f3b-9c8e-1a2b3c4d5e6f")),
+        Principal(
+            "alice-0001",
+            "alice",
+            "alice@example.org",
+            frozenset({Role.USER}),
+            "2b7f0c3e-5d1a-4f3b-9c8e-1a2b3c4d5e6f",
+        ),
+    ),
+    ("a session id that is not text is ignored", signed(claims(sid=7)), ALICE),
+    ("an empty session id is ignored", signed(claims(sid="")), ALICE),
 ]
 
 

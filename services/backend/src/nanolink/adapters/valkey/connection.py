@@ -34,5 +34,5 @@ def link_cache_key(short_code: str) -> str:
     return f"link:{short_code}"
 
 
-def quota_key(owner_id: str, day: date) -> str:
-    return f"quota:{owner_id}:{day.isoformat()}"
+def quota_key(quota_holder: str, day: date) -> str:
+    return f"quota:{quota_holder}:{day.isoformat()}"

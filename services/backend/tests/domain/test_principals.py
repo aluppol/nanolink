@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from nanolink.domain.principals import GUEST_DAILY_QUOTA, USER_DAILY_QUOTA, Principal, Role, is_owner_id
 from nanolink.domain.sandbox import SANDBOX_OWNER_ID
-from tests.support import ADMIN, ALICE, GUEST, report_mismatches
+from tests.support import ADMIN, ALICE, GUEST, GUEST_IN_SESSION, report_mismatches
 
 
 @dataclass(frozen=True)
@@ -10,6 +10,7 @@ class Case:
     id: str
     principal: Principal
     owner_id: str
+    quota_holder: str
     daily_quota: int | None
     is_admin: bool
     is_guest: bool
@@ -25,16 +26,37 @@ CASES = [
         "user owns their links",
         ALICE,
         ALICE.subject,
+        ALICE.subject,
         USER_DAILY_QUOTA,
         is_admin=False,
         is_guest=False,
         notify_email=ALICE.email,
     ),
-    Case("admin has no quota", ADMIN, ADMIN.subject, None, is_admin=True, is_guest=False, notify_email=None),
     Case(
-        "guest works in the sandbox",
+        "admin has no quota",
+        ADMIN,
+        ADMIN.subject,
+        ADMIN.subject,
+        None,
+        is_admin=True,
+        is_guest=False,
+        notify_email=None,
+    ),
+    Case(
+        "guest works in the sandbox, counted by subject without a session",
         GUEST,
         SANDBOX_OWNER_ID,
+        "guest-guest-0004",
+        GUEST_DAILY_QUOTA,
+        is_admin=False,
+        is_guest=True,
+        notify_email=None,
+    ),
+    Case(
+        "guest in a session is counted per session",
+        GUEST_IN_SESSION,
+        SANDBOX_OWNER_ID,
+        "guest-session-1",
         GUEST_DAILY_QUOTA,
         is_admin=False,
         is_guest=True,
@@ -44,6 +66,7 @@ CASES = [
         "guest role wins over admin",
         ADMIN_WHO_IS_ALSO_GUEST,
         SANDBOX_OWNER_ID,
+        "guest-mixed-0005",
         GUEST_DAILY_QUOTA,
         is_admin=False,
         is_guest=True,
@@ -57,12 +80,20 @@ def test_principal_rules() -> None:
     for case in CASES:
         actual = (
             case.principal.owner_id,
+            case.principal.quota_holder,
             case.principal.daily_quota,
             case.principal.is_admin,
             case.principal.is_guest,
             case.principal.notify_email,
         )
-        expected = (case.owner_id, case.daily_quota, case.is_admin, case.is_guest, case.notify_email)
+        expected = (
+            case.owner_id,
+            case.quota_holder,
+            case.daily_quota,
+            case.is_admin,
+            case.is_guest,
+            case.notify_email,
+        )
         if actual != expected:
             mismatches.append(f"{case.id}: expected {expected}, got {actual}")
     report_mismatches(mismatches)

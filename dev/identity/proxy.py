@@ -18,6 +18,7 @@ UPSTREAM = os.environ.get("DEV_UPSTREAM", "http://web:8080")
 AUDIENCE = "nanolink"
 KEY_ID = f"nanolink-dev-{secrets.token_hex(6)}"
 USER_COOKIE = "nanolink_dev_user"
+SESSION_COOKIE = "nanolink_dev_session"
 TOKEN_HEADER = "x-forwarded-access-token"
 HOP_BY_HOP = frozenset(
     {
@@ -53,7 +54,7 @@ app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 upstream = httpx.AsyncClient(base_url=UPSTREAM, timeout=httpx.Timeout(10.0, read=None))
 
 
-def access_token(username: str) -> str:
+def access_token(username: str, session_id: str) -> str:
     user, now = DEV_USERS[username], int(time.time())
     claims = {
         "iss": ISSUER,
@@ -61,6 +62,7 @@ def access_token(username: str) -> str:
         "azp": AUDIENCE,
         "typ": "Bearer",
         "sub": user["sub"],
+        "sid": session_id,
         "preferred_username": username,
         "email": user["email"],
         "email_verified": True,
@@ -94,6 +96,7 @@ async def sign_in(username: str) -> Response:
         return RedirectResponse("/__dev/login", status_code=302)
     response = RedirectResponse("/", status_code=302)
     response.set_cookie(USER_COOKIE, username, httponly=True, samesite="lax")
+    response.set_cookie(SESSION_COOKIE, secrets.token_hex(16), httponly=True, samesite="lax")
     return response
 
 
@@ -101,19 +104,20 @@ async def sign_in(username: str) -> Response:
 async def sign_out() -> Response:
     response = RedirectResponse("/__dev/login", status_code=302)
     response.delete_cookie(USER_COOKIE)
+    response.delete_cookie(SESSION_COOKIE)
     return response
 
 
 @app.api_route("/{path:path}", methods=["GET", "HEAD", "POST", "PATCH", "PUT", "DELETE"])
 async def forward(request: Request, path: str) -> Response:
-    username = request.cookies.get(USER_COOKIE)
-    if username not in DEV_USERS:
+    username, session_id = request.cookies.get(USER_COOKIE), request.cookies.get(SESSION_COOKIE)
+    if username not in DEV_USERS or not session_id:
         return signed_out_answer(path)
     headers = {
         name.lower(): value for name, value in request.headers.items() if name.lower() not in NOT_FORWARDED
     }
     headers.setdefault("accept-encoding", "identity")
-    headers[TOKEN_HEADER] = access_token(username)
+    headers[TOKEN_HEADER] = access_token(username, session_id)
     outgoing = upstream.build_request(
         request.method, f"/{path}", params=request.query_params, headers=headers, content=await request.body()
     )

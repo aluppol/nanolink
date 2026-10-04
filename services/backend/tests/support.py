@@ -16,6 +16,8 @@ ALICE = Principal("alice-0001", "alice", "alice@example.org", frozenset({Role.US
 BOB = Principal("bob-0002", "bob", "bob@example.org", frozenset({Role.USER}))
 ADMIN = Principal("admin-0003", "admin", None, frozenset({Role.ADMIN}))
 GUEST = Principal("guest-0004", "guest", "recruiter@example.org", frozenset({Role.GUEST}))
+GUEST_IN_SESSION = Principal("guest-0004", "guest", None, frozenset({Role.GUEST}), "session-1")
+GUEST_IN_OTHER_SESSION = Principal("guest-0004", "guest", None, frozenset({Role.GUEST}), "session-2")
 
 
 def report_mismatches(mismatches: Sequence[str]) -> None:
@@ -184,23 +186,22 @@ class RecordingCache:
 
 
 class CountingQuota:
-    def __init__(self, used: int = 0) -> None:
-        self.used = used
+    def __init__(self, used: Mapping[str, int] | None = None) -> None:
+        self.used: dict[str, int] = dict(used or {})
 
-    async def consume(self, owner_id: str, limit: int) -> None:
-        self.used += 1
-        if self.used > limit:
-            self.used -= 1
+    async def consume(self, quota_holder: str, limit: int) -> None:
+        if self.used.get(quota_holder, 0) >= limit:
             raise QuotaExceeded
+        self.used[quota_holder] = self.used.get(quota_holder, 0) + 1
 
-    async def refund(self, owner_id: str) -> None:
-        self.used -= 1
+    async def refund(self, quota_holder: str) -> None:
+        self.used[quota_holder] = self.used.get(quota_holder, 0) - 1
 
-    async def used_today(self, owner_id: str) -> int:
-        return self.used
+    async def used_today(self, quota_holder: str) -> int:
+        return self.used.get(quota_holder, 0)
 
-    async def clear(self, owner_id: str) -> None:
-        self.used = 0
+    async def clear(self, quota_holder: str) -> None:
+        self.used.pop(quota_holder, None)
 
 
 class ScriptedCodes:

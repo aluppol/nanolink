@@ -3,7 +3,7 @@ from nanolink.application.sandbox import DemoSandbox
 from nanolink.application.task_reports import TaskReports
 from nanolink.domain.errors import TaskNotFound
 from nanolink.domain.links import LinkDraft
-from nanolink.domain.sandbox import DEMO_SEED_CODES, SANDBOX_OWNER_ID
+from nanolink.domain.sandbox import DEMO_SEED_CODES, SANDBOX_OWNER_ID, SANDBOX_QUOTA_HOLDER
 from nanolink.domain.tasks import CreateLinkTask, TaskReport, TaskResult, TaskStatus
 from tests.support import (
     ALICE,
@@ -22,7 +22,8 @@ ALICE_LINK = LinkDraft("a-1", "Alice1", "https://example.com/a1", ALICE.subject)
 
 
 def sandbox_world() -> tuple[InMemoryLinks, InMemoryTaskLedger, RecordingCache, DemoSandbox]:
-    links, ledger, cache, quota = InMemoryLinks(), InMemoryTaskLedger(), RecordingCache(), CountingQuota(25)
+    links, ledger, cache = InMemoryLinks(), InMemoryTaskLedger(), RecordingCache()
+    quota = CountingQuota({SANDBOX_QUOTA_HOLDER: 25})
     links.add_active(GUEST_ACTIVE)
     links.add_deleted(GUEST_DELETED)
     links.add_active(ALICE_LINK)
@@ -42,9 +43,10 @@ async def test_reset_replaces_sandbox_links_with_the_seeds_only() -> None:
 
 
 async def test_reset_gives_the_sandbox_a_fresh_daily_quota() -> None:
-    links, ledger, cache, quota = InMemoryLinks(), InMemoryTaskLedger(), RecordingCache(), CountingQuota(25)
+    links, ledger, cache = InMemoryLinks(), InMemoryTaskLedger(), RecordingCache()
+    quota = CountingQuota({SANDBOX_QUOTA_HOLDER: 25})
     await DemoSandbox(links, ledger, cache, quota).reset()
-    assert await quota.used_today("sandbox") == 0
+    assert await quota.used_today(SANDBOX_QUOTA_HOLDER) == 0
 
 
 async def test_reset_is_idempotent() -> None:

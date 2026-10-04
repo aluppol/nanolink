@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from nanolink.domain.links import LinkDraft
 
 SANDBOX_OWNER_ID = "sandbox"
+SANDBOX_QUOTA_HOLDER = "sandbox"
+SANDBOX_DAILY_QUOTA = 500
 SEED_TASK_PREFIX = "seed-"
 
 

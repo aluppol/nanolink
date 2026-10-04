@@ -35,10 +35,10 @@ class ValkeyDailyQuota:
         self._today = today
         self._consume_within_limit = client.register_script(CONSUME_WITHIN_LIMIT)
 
-    async def consume(self, owner_id: str, limit: int) -> None:
+    async def consume(self, quota_holder: str, limit: int) -> None:
         try:
             allowed = await self._consume_within_limit(
-                keys=[self._key(owner_id)], args=[limit, KEY_LIFETIME_SECONDS]
+                keys=[self._key(quota_holder)], args=[limit, KEY_LIFETIME_SECONDS]
             )
         except RedisError:
             logger.warning("quota store unavailable; allowing the request")
@@ -46,20 +46,20 @@ class ValkeyDailyQuota:
         if not allowed:
             raise QuotaExceeded
 
-    async def refund(self, owner_id: str) -> None:
+    async def refund(self, quota_holder: str) -> None:
         with suppress(RedisError):
-            await self._client.decr(self._key(owner_id))
+            await self._client.decr(self._key(quota_holder))
 
-    async def clear(self, owner_id: str) -> None:
+    async def clear(self, quota_holder: str) -> None:
         with suppress(RedisError):
-            await self._client.delete(self._key(owner_id))
+            await self._client.delete(self._key(quota_holder))
 
-    async def used_today(self, owner_id: str) -> int:
+    async def used_today(self, quota_holder: str) -> int:
         try:
-            used = await self._client.get(self._key(owner_id))
+            used = await self._client.get(self._key(quota_holder))
         except RedisError:
             return 0
         return int(used or 0)
 
-    def _key(self, owner_id: str) -> str:
-        return quota_key(owner_id, self._today())
+    def _key(self, quota_holder: str) -> str:
+        return quota_key(quota_holder, self._today())

@@ -122,6 +122,21 @@ async def sandbox_links_ask_first() -> str:
     return f"the guest's link {code} shows its destination instead of redirecting"
 
 
+async def guests_count_their_own_quota() -> str:
+    first, second = await signed_in("guest"), await signed_in("guest")
+    before = (await second.get("/api/me")).json()["created_today"]
+    accepted = await first.post(
+        "/api/links", json={"long_url": f"https://example.com/e2e/{uuid.uuid4().hex}"}
+    )
+    assert accepted.status_code == 202, accepted.text
+    mine = (await first.get("/api/me")).json()["created_today"]
+    theirs = (await second.get("/api/me")).json()["created_today"]
+    assert (mine, theirs) == (1, before), (mine, theirs, before)
+    for client in (first, second):
+        await client.aclose()
+    return "two guest sessions count their daily quota separately"
+
+
 async def input_rules() -> str:
     alice = await signed_in("alice")
     for bad_url in (
@@ -146,6 +161,7 @@ async def main() -> int:
         isolation_between_owners,
         guest_sandbox,
         sandbox_links_ask_first,
+        guests_count_their_own_quota,
         input_rules,
     ):
         try:

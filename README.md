@@ -51,7 +51,7 @@ The four Python services are one codebase and one image. Each runs its own entry
 ### Creating a link
 
 1. The browser sends `POST /api/links {"long_url": …}`. oauth2-proxy adds the user's Keycloak access token.
-2. The gateway validates the token itself (JWKS signature, `iss`, `aud` = `nanolink`, `exp`, token type) and checks the URL. It never fetches the URL; see [Security](#security). Then it counts the request against the owner's quota for the current UTC day and publishes a task to `links.create.<user id>` with the task id as the JetStream message id, so a retried publish is stored once. JetStream's acknowledgement is **ack 1**; the gateway then answers `202 Accepted` with the task id (**ack 2**).
+2. The gateway validates the token itself (JWKS signature, `iss`, `aud` = `nanolink`, `exp`, token type) and checks the URL. It never fetches the URL; see [Security](#security). Then it counts the request against the caller's quota for the current UTC day (for a guest: the quota of their sign-in session and a cap shared by the whole guest sandbox) and publishes a task to `links.create.<user id>` with the task id as the JetStream message id, so a retried publish is stored once. JetStream's acknowledgement is **ack 1**; the gateway then answers `202 Accepted` with the task id (**ack 2**).
 3. The creator pulls up to 100 tasks at a time. It drops duplicates and reuses the user's existing active link for the same URL. It inserts the rest in one unordered `insert_many`, with timestamps taken from the MongoDB server clock. Unique indexes decide collisions, and a taken short code is retried with a new one. It writes the outcome to the task ledger, which is **ack 3**, and publishes the result. Redelivered tasks are recognised by their task id, so processing is idempotent.
 4. The notifier forwards the result to the creator's open `EventSource`, and the new link appears in the UI. `GET /api/tasks/{id}` gives the same answer to clients that poll.
 
@@ -103,7 +103,7 @@ Locally, a small development proxy (`dev/identity/proxy.py`) plays the part of o
 ```bash
 docker run --rm -i --network nanolink_back nanolink/backend:dev python - < dev/e2e.py
 ```
-This end-to-end check signs in, creates a link through the queue and waits for the pushed result, follows the redirect, re-points and deletes the link, and checks owner isolation, the admin view, the guest sandbox, that a sandbox link shows its target instead of redirecting, and the input rules.
+This end-to-end check signs in, creates a link through the queue and waits for the pushed result, follows the redirect, re-points and deletes the link, and checks owner isolation, the admin view, the guest sandbox, that a sandbox link shows its target instead of redirecting, that two guest sessions count their quota separately, and the input rules.
 
 ## API
 
@@ -125,7 +125,8 @@ The OpenAPI document is served at `/api/openapi.json`.
 ## Security
 
 - **Tokens:** oauth2-proxy handles the login. The gateway and the notifier still verify every access token themselves: RS256 only, JWKS signature, `iss`, `aud` containing `nanolink`, `exp`, and `typ` = `Bearer`, so an ID token is refused. Roles come from `realm_access.roles`. Tests cover forged, expired, foreign-audience, algorithm-confusion (HS256 signed with the public key) and unsigned tokens.
-- **Object-level checks:** every link and task query is scoped to the caller. The guest role works in a shared sandbox; the `demo-reset` command, which the demo server is to run nightly, wipes and reseeds it and restores its quota. Moderation needs `ADMIN`.
+- **Object-level checks:** every link and task query is scoped to the caller. The guest role works in a shared sandbox; the `demo-reset` command, which the demo server runs nightly, wipes and reseeds it and restores its shared quota. Moderation needs `ADMIN`.
+- **Daily quotas:** 200 links per user, none for admins. Guests get 25 per sign-in session (the Keycloak `sid`), so one session cannot use up the demo for everyone, and 500 for the whole sandbox, which bounds what the public login can write in a day. Someone who keeps signing in again can still reach that cap; guests then get `429` until midnight UTC or the nightly reset. The counters live in Valkey without persistence, and while it is unreachable requests are let through rather than refused.
 - **No open redirect:** links made with the shared guest account show their target and wait for a click instead of redirecting ([Serving a click](#serving-a-click)). That page has its own strict CSP (no scripts, no framing) and escapes the address.
 - **No server-side requests to user URLs:** NanoLink never fetches a submitted address, so there is no SSRF surface. It still refuses destinations that point into private space: non-http(s) schemes, embedded credentials, loopback, private, link-local and CGNAT addresses (including `169.254.169.254` and IPv4-mapped IPv6), numeric host forms such as `2130706433` or `0x7f.1`, single-label hosts, and internal top-level domains.
 - **Least privilege in the data layer:** the MongoDB users are `gateway` and `creator` (readWrite) and `redirect` (read only). A JSON-schema validator guards the `links` collection.
@@ -137,7 +138,7 @@ The OpenAPI document is served at `/api/openapi.json`.
 
 | Part | Checks | Tests |
 |---|---|---|
-| `services/backend` | `ruff` (lint + format), `mypy --strict`, house-rule check (no comments or docstrings, functions ≤ 30 lines), `pip-audit` | 47 contract tests (each unit a `CASES` table) + 12 integration tests against real MongoDB, NATS and Valkey |
+| `services/backend` | `ruff` (lint + format), `mypy --strict`, house-rule check (no comments or docstrings, functions ≤ 30 lines), `pip-audit` | 48 contract tests (each unit a `CASES` table) + 12 integration tests against real MongoDB, NATS and Valkey |
 | `services/redirect` | Biome, `tsc` strict, comment check, `npm audit` | 19 contract tests (Fastify `inject` with in-memory ports) |
 | `services/web` | Biome, `tsc` strict, comment check, `npm audit` | 16 contract tests of the UI model; nginx `-t` at image build |
 | whole stack | `deploy/smoke.sh`: 12 HTTP checks against the production compose file; `dev/e2e.py`: the signed-in flows | CI jobs `stack` and `e2e` |

@@ -1,7 +1,8 @@
-from nanolink.domain.errors import DependencyUnavailable, InvalidLongUrl
+from nanolink.domain.errors import DependencyUnavailable, InvalidLongUrl, QuotaExceeded, SandboxQuotaExceeded
 from nanolink.domain.long_urls import long_url_problem
 from nanolink.domain.ports import DailyQuota, TaskLedger, TaskQueue
 from nanolink.domain.principals import Principal
+from nanolink.domain.sandbox import SANDBOX_DAILY_QUOTA, SANDBOX_QUOTA_HOLDER
 from nanolink.domain.tasks import CreateLinkTask
 
 
@@ -29,12 +30,23 @@ class LinkCreationRequests:
         await self._ledger.record_queued(task)
 
     async def used_today(self, principal: Principal) -> int:
-        return await self._quota.used_today(principal.owner_id)
+        return await self._quota.used_today(principal.quota_holder)
 
     async def _consume_quota(self, principal: Principal) -> None:
-        if principal.daily_quota is not None:
-            await self._quota.consume(principal.owner_id, principal.daily_quota)
+        if principal.daily_quota is None:
+            return
+        await self._quota.consume(principal.quota_holder, principal.daily_quota)
+        if not principal.is_guest:
+            return
+        try:
+            await self._quota.consume(SANDBOX_QUOTA_HOLDER, SANDBOX_DAILY_QUOTA)
+        except QuotaExceeded:
+            await self._quota.refund(principal.quota_holder)
+            raise SandboxQuotaExceeded from None
 
     async def _refund_quota(self, principal: Principal) -> None:
-        if principal.daily_quota is not None:
-            await self._quota.refund(principal.owner_id)
+        if principal.daily_quota is None:
+            return
+        await self._quota.refund(principal.quota_holder)
+        if principal.is_guest:
+            await self._quota.refund(SANDBOX_QUOTA_HOLDER)

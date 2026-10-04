@@ -13,6 +13,7 @@ class Role(StrEnum):
 
 GUEST_DAILY_QUOTA = 25
 USER_DAILY_QUOTA = 200
+GUEST_QUOTA_HOLDER_PREFIX = "guest-"
 
 _OWNER_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
@@ -27,6 +28,7 @@ class Principal:
     username: str
     email: str | None
     roles: frozenset[Role]
+    session_id: str | None = None
 
     @property
     def is_guest(self) -> bool:
@@ -39,6 +41,12 @@ class Principal:
     @property
     def owner_id(self) -> str:
         return SANDBOX_OWNER_ID if self.is_guest else self.subject
+
+    @property
+    def quota_holder(self) -> str:
+        if self.is_guest:
+            return f"{GUEST_QUOTA_HOLDER_PREFIX}{self.session_id or self.subject}"
+        return self.owner_id
 
     @property
     def daily_quota(self) -> int | None:

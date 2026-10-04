@@ -92,6 +92,7 @@ class Case:
     body: dict[str, Any] | None = None
     json: dict[str, Any] | None = None
     headers: dict[str, str] | None = None
+    quota_used: dict[str, int] | None = None
 
 
 CASES = [
@@ -134,6 +135,29 @@ CASES = [
         json={"long_url": "https://example.com/", "short_code": "custom"},
     ),
     Case("submit without a body", "POST", "/api/links", "alice", 422, {"error": "invalid_request"}),
+    Case(
+        "a guest session over its quota",
+        "POST",
+        "/api/links",
+        "guest",
+        429,
+        {"error": "quota_exceeded", "message": "your daily link quota is used up; try again tomorrow"},
+        json={"long_url": "https://example.com/over"},
+        quota_used={"guest-guest-0004": 25},
+    ),
+    Case(
+        "a guest when the whole sandbox is full",
+        "POST",
+        "/api/links",
+        "guest",
+        429,
+        {
+            "error": "quota_exceeded",
+            "message": "the shared guest sandbox has reached today's limit; try again tomorrow",
+        },
+        json={"long_url": "https://example.com/full"},
+        quota_used={"sandbox": 500},
+    ),
     Case("list own links", "GET", "/api/links", "alice", 200, {"next_cursor": None}),
     Case("page size zero", "GET", "/api/links?limit=0", "alice", 422, {"error": "invalid_request"}),
     Case("malformed cursor", "GET", "/api/links?cursor=zz", "alice", 422, {"error": "invalid_request"}),
@@ -207,7 +231,7 @@ CASES = [
 
 def run_case(case: Case) -> str | None:
     headers = {**(case.headers or {}), **({ACCESS_TOKEN_HEADER: case.token} if case.token else {})}
-    with client_for(Fakes()) as client:
+    with client_for(Fakes(quota=CountingQuota(case.quota_used))) as client:
         response = client.request(case.method, case.path, json=case.json, headers=headers)
     body = response.json() if response.content else None
     missing = {key: value for key, value in (case.body or {}).items() if (body or {}).get(key) != value}

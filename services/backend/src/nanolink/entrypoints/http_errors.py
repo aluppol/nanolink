@@ -19,6 +19,7 @@ from nanolink.domain.errors import (
     NotAuthenticated,
     NotAuthorized,
     QuotaExceeded,
+    SandboxQuotaExceeded,
     TaskNotFound,
 )
 from nanolink.entrypoints.http_views import ErrorView
@@ -31,6 +32,11 @@ DOMAIN_ERRORS: Mapping[type, tuple[int, str, str]] = {
     LinkNotFound: (404, "not_found", "there is no such link"),
     TaskNotFound: (404, "not_found", "there is no such task"),
     QuotaExceeded: (429, "quota_exceeded", "your daily link quota is used up; try again tomorrow"),
+    SandboxQuotaExceeded: (
+        429,
+        "quota_exceeded",
+        "the shared guest sandbox has reached today's limit; try again tomorrow",
+    ),
     NotAuthenticated: (401, "unauthenticated", "your session is missing or has expired; sign in again"),
     NotAuthorized: (403, "forbidden", "your account is not allowed to do this"),
     DependencyUnavailable: (503, "unavailable", "a backing service is unavailable; try again shortly"),
