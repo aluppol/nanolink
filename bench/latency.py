@@ -6,7 +6,7 @@ import time
 import httpx
 
 BASE_URL = os.environ.get("BASE_URL", "http://web:8080")
-SHORT_CODE = os.environ.get("SHORT_CODE", "Albert")
+SHORT_CODE = os.environ.get("SHORT_CODE", "")
 WARM_UP_REQUESTS = 200
 MEASURED_REQUESTS = int(os.environ.get("REQUESTS", "2000"))
 
@@ -36,6 +36,9 @@ def describe(samples: list[float], elapsed: float) -> str:
 
 
 def main() -> int:
+    if not SHORT_CODE:
+        sys.stderr.write("set SHORT_CODE to a link made by a member; sandbox links do not redirect\n")
+        return 2
     with httpx.Client(base_url=BASE_URL, follow_redirects=False, timeout=10) as client:
         for _ in range(WARM_UP_REQUESTS):
             timed_redirect(client)

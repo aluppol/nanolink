@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import type { FastifyInstance, InjectOptions } from "fastify";
-import { activeLink, DELETED_LINK } from "../src/domain/linkResolution.js";
+import { activeLink, DELETED_LINK, sandboxedLink } from "../src/domain/linkResolution.js";
 import { LinkResolver } from "../src/domain/linkResolver.js";
 import type { LinkSource } from "../src/domain/linkSource.js";
 import { PAGE_SECURITY_POLICY } from "../src/http/pages.js";
@@ -23,6 +23,7 @@ interface Observed {
 const LINKS = new InMemoryLinkSource({
   aB3xY9: activeLink("https://example.org/path?q=1"),
   uN1c0d: activeLink("https://exämple.org/ü"),
+  sAndB0: sandboxedLink("https://exämple.org/a?b=1&c=2"),
   dE1eT3: DELETED_LINK,
 });
 
@@ -36,7 +37,7 @@ after(async () => {
 const NO_STORE = "no-store";
 const FOUND = { status: 302, cacheControl: NO_STORE, body: "" } as const;
 
-function errorAnswer(status: number, body: string): Observed {
+function contentAnswer(status: number, body: string): Observed {
   return { status, cacheControl: NO_STORE, securityPolicy: PAGE_SECURITY_POLICY, body };
 }
 
@@ -62,49 +63,64 @@ const CASES: readonly Case<InjectOptions, Observed>[] = [
     expected: { ...FOUND, location: "https://xn--exmple-cua.org/%C3%BC" },
   },
   {
+    id: "sandboxed code shows browsers a confirmation page instead of redirecting",
+    input: { method: "GET", url: "/sAndB0", headers: { accept: BROWSER_ACCEPT } },
+    expected: contentAnswer(200, "html:Check where this link goes"),
+  },
+  {
+    id: "sandboxed code gives API clients its long URL instead of redirecting",
+    input: { method: "GET", url: "/sAndB0", headers: { accept: JSON_ACCEPT } },
+    expected: contentAnswer(200, 'json:{"long_url":"https://xn--exmple-cua.org/a?b=1&c=2"}'),
+  },
+  {
+    id: "HEAD on a sandboxed code does not redirect either",
+    input: { method: "HEAD", url: "/sAndB0" },
+    expected: contentAnswer(200, ""),
+  },
+  {
     id: "deleted code is 410 JSON for API clients",
     input: { method: "GET", url: "/dE1eT3", headers: { accept: JSON_ACCEPT } },
-    expected: errorAnswer(410, 'json:{"error":"gone"}'),
+    expected: contentAnswer(410, 'json:{"error":"gone"}'),
   },
   {
     id: "deleted code is a 410 page for browsers",
     input: { method: "GET", url: "/dE1eT3", headers: { accept: BROWSER_ACCEPT } },
-    expected: errorAnswer(410, "html:This link was deleted"),
+    expected: contentAnswer(410, "html:This link was deleted"),
   },
   {
     id: "unknown code is 404 JSON without an Accept header",
     input: { method: "GET", url: "/zZ9zZ9" },
-    expected: errorAnswer(404, 'json:{"error":"not_found"}'),
+    expected: contentAnswer(404, 'json:{"error":"not_found"}'),
   },
   {
     id: "unknown code is a 404 page for browsers",
     input: { method: "GET", url: "/zZ9zZ9", headers: { accept: BROWSER_ACCEPT } },
-    expected: errorAnswer(404, "html:This link doesn't exist"),
+    expected: contentAnswer(404, "html:This link doesn't exist"),
   },
   {
     id: "five-character path is 404",
     input: { method: "GET", url: "/aB3xY", headers: { accept: JSON_ACCEPT } },
-    expected: errorAnswer(404, 'json:{"error":"not_found"}'),
+    expected: contentAnswer(404, 'json:{"error":"not_found"}'),
   },
   {
     id: "nested path is 404",
     input: { method: "GET", url: "/aB3xY9/more", headers: { accept: JSON_ACCEPT } },
-    expected: errorAnswer(404, 'json:{"error":"not_found"}'),
+    expected: contentAnswer(404, 'json:{"error":"not_found"}'),
   },
   {
     id: "root is 404",
     input: { method: "GET", url: "/", headers: { accept: BROWSER_ACCEPT } },
-    expected: errorAnswer(404, "html:This link doesn't exist"),
+    expected: contentAnswer(404, "html:This link doesn't exist"),
   },
   {
     id: "POST to a code is 404",
     input: { method: "POST", url: "/aB3xY9", headers: { accept: JSON_ACCEPT } },
-    expected: errorAnswer(404, 'json:{"error":"not_found"}'),
+    expected: contentAnswer(404, 'json:{"error":"not_found"}'),
   },
   {
     id: "malformed percent-encoding is 404",
     input: { method: "GET", url: "/%zz%zz", headers: { accept: JSON_ACCEPT } },
-    expected: errorAnswer(404, 'json:{"error":"not_found"}'),
+    expected: contentAnswer(404, 'json:{"error":"not_found"}'),
   },
 ];
 
@@ -112,21 +128,21 @@ const BROKEN_DATABASE_CASES: readonly Case<InjectOptions, Observed>[] = [
   {
     id: "database failure is 503 JSON",
     input: { method: "GET", url: "/aB3xY9", headers: { accept: JSON_ACCEPT } },
-    expected: errorAnswer(503, 'json:{"error":"unavailable"}'),
+    expected: contentAnswer(503, 'json:{"error":"unavailable"}'),
   },
   {
     id: "database failure is a 503 page for browsers",
     input: { method: "GET", url: "/aB3xY9", headers: { accept: BROWSER_ACCEPT } },
-    expected: errorAnswer(503, "html:NanoLink is temporarily unavailable"),
+    expected: contentAnswer(503, "html:NanoLink is temporarily unavailable"),
   },
   {
     id: "malformed code never reaches the database",
     input: { method: "GET", url: "/not-a-code", headers: { accept: JSON_ACCEPT } },
-    expected: errorAnswer(404, 'json:{"error":"not_found"}'),
+    expected: contentAnswer(404, 'json:{"error":"not_found"}'),
   },
 ];
 
-test("GET /:code answers 302, 404 or 410 in the representation the client accepts", async () => {
+test("GET /:code answers 302, 200 for sandbox links, 404 or 410 as the client accepts", async () => {
   assert.deepEqual(await mismatchesOf(CASES, (request) => observe(HEALTHY_SERVER, request)), []);
 });
 
@@ -160,6 +176,9 @@ function headerText(value: string | string[] | number | undefined): string | und
 }
 
 function summarize(contentType: string | undefined, body: string): string {
+  if (body === "") {
+    return body;
+  }
   if (contentType?.startsWith("text/html") === true) {
     return `html:${/<h1>(.*?)<\/h1>/.exec(body)?.[1] ?? "no heading"}`;
   }

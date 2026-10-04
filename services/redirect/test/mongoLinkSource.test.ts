@@ -12,19 +12,33 @@ import {
   DELETED_LINK,
   type LinkResolution,
   MISSING_LINK,
+  sandboxedLink,
 } from "../src/domain/linkResolution.js";
 import { type Case, mismatchesOf } from "./support/cases.js";
+
+const MEMBER_ID = "0b7d4c1e-0000-4000-8000-00000000a11c";
+const DELETION_TIME = new Date("2026-09-23T12:00:00Z");
 
 const CASES: readonly Case<ResolvableLinkRecord | null, LinkResolution>[] = [
   { id: "no record is missing", input: null, expected: MISSING_LINK },
   {
-    id: "record without deletion is active",
-    input: { long_url: "https://example.org/", deleted_at: null },
+    id: "member's record without deletion is active",
+    input: { long_url: "https://example.org/", owner_id: MEMBER_ID, deleted_at: null },
     expected: activeLink("https://example.org/"),
   },
   {
+    id: "sandbox record without deletion is sandboxed",
+    input: { long_url: "https://example.org/", owner_id: "sandbox", deleted_at: null },
+    expected: sandboxedLink("https://example.org/"),
+  },
+  {
     id: "record with a deletion time is deleted",
-    input: { long_url: "https://example.org/", deleted_at: new Date("2026-09-23T12:00:00Z") },
+    input: { long_url: "https://example.org/", owner_id: MEMBER_ID, deleted_at: DELETION_TIME },
+    expected: DELETED_LINK,
+  },
+  {
+    id: "deleted sandbox record is deleted",
+    input: { long_url: "https://example.org/", owner_id: "sandbox", deleted_at: DELETION_TIME },
     expected: DELETED_LINK,
   },
 ];
@@ -37,7 +51,11 @@ interface FindOneCall {
 function recordingCollection(calls: FindOneCall[]): Collection<LinkRecord> {
   const findOne = (filter: unknown, options: unknown): Promise<ResolvableLinkRecord> => {
     calls.push({ filter, options });
-    return Promise.resolve({ long_url: "https://example.org/", deleted_at: null });
+    return Promise.resolve({
+      long_url: "https://example.org/",
+      owner_id: MEMBER_ID,
+      deleted_at: null,
+    });
   };
   return { findOne } as unknown as Collection<LinkRecord>;
 }
@@ -53,7 +71,7 @@ test("MongoLinkSource asks for one record by short_code with the §10 projection
   assert.deepEqual(calls, [
     {
       filter: { short_code: "aB3xY9" },
-      options: { projection: { _id: 0, long_url: 1, deleted_at: 1 } },
+      options: { projection: { _id: 0, long_url: 1, owner_id: 1, deleted_at: 1 } },
     },
   ]);
 });

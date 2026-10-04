@@ -8,9 +8,23 @@ const PAGE_STYLE = [
   "h1{font-size:1.5rem;margin:0 0 .75rem}",
   "p{line-height:1.5;margin:0 0 1.25rem;color:#4a5263}",
   "a{color:#2b59c3}",
+  "code,.host{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}",
+  "code{display:block;padding:.75rem 1rem;border-radius:.5rem;background:#e8ebf1;color:#1c2330;",
+  "font-size:.9rem;line-height:1.5;overflow-wrap:anywhere}",
+  ".continue{display:inline-block;padding:.625rem 1.125rem;border-radius:.5rem;",
+  "background:#2b59c3;color:#fff;font-weight:600;text-decoration:none;overflow-wrap:anywhere}",
   "@media (prefers-color-scheme:dark){body{background:#12151c;color:#e7eaf0}",
-  "p{color:#a9b1c2}a{color:#8fb0ff}}",
+  "p{color:#a9b1c2}a{color:#8fb0ff}code{background:#1e2430;color:#e7eaf0}",
+  ".continue{background:#8fb0ff;color:#12151c}}",
 ].join("");
+
+const HTML_ESCAPES: Readonly<Record<string, string>> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+};
 
 export const PAGE_SECURITY_POLICY = [
   "default-src 'none'",
@@ -44,14 +58,35 @@ export const INTERNAL_ERROR_PAGE = renderPage(
   "The error has been logged. Please try again later.",
 );
 
-function renderPage(title: string, heading: string, message: string): string {
+export function confirmationPage(longUrl: URL): string {
+  const escapedHref = escapeHtml(longUrl.href);
+  const escapedHost = escapeHtml(longUrl.host);
+  return renderPage(
+    "Check this link",
+    "Check where this link goes",
+    "This link was made with the shared guest account, which anyone can use.",
+    "Nobody has checked where it leads. Continue only if you trust this address:",
+    `<code>${escapedHref}</code>`,
+    [
+      `<a class="continue" href="${escapedHref}" rel="noreferrer nofollow ugc">`,
+      `Continue to <span class="host">${escapedHost}</span></a>`,
+    ].join(""),
+  );
+}
+
+function renderPage(title: string, heading: string, ...htmlParagraphs: readonly string[]): string {
   return [
     "<!doctype html>",
     '<html lang="en"><head><meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     '<meta name="robots" content="noindex">',
     `<title>${title} · NanoLink</title><style>${PAGE_STYLE}</style></head>`,
-    `<body><main><h1>${heading}</h1><p>${message}</p>`,
+    `<body><main><h1>${heading}</h1>`,
+    ...htmlParagraphs.map((paragraph) => `<p>${paragraph}</p>`),
     '<p><a href="/">Open NanoLink</a></p></main></body></html>',
   ].join("");
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (character) => HTML_ESCAPES[character] ?? character);
 }

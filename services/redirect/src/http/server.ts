@@ -10,7 +10,7 @@ import type { LinkResolver } from "../domain/linkResolver.js";
 import type { ReadinessProbe } from "../domain/readinessProbe.js";
 import { registerHealthRoutes } from "./healthRoutes.js";
 import { registerRedirectRoutes, replyNotFound } from "./redirectRoutes.js";
-import { replyWithError } from "./replies.js";
+import { replyWithContent } from "./replies.js";
 import { representationFor } from "./representations.js";
 
 export interface RedirectServerParts {
@@ -42,7 +42,7 @@ function replyToFailure(
   }
   request.log.error({ err: error }, "request failed");
   const representation = representationFor(request.headers.accept);
-  return replyWithError(reply, 500, representation.contentType, representation.internalError);
+  return replyWithContent(reply, 500, representation.contentType, representation.internalError);
 }
 
 function isClientError(error: FastifyError): boolean {

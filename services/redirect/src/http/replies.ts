@@ -1,24 +1,31 @@
 import type { FastifyReply } from "fastify";
 import type { LinkResolution } from "../domain/linkResolution.js";
 import { PAGE_SECURITY_POLICY } from "./pages.js";
-import type { ErrorRepresentation } from "./representations.js";
+import type { Representation } from "./representations.js";
 
 export function replyWithResolution(
   reply: FastifyReply,
   resolution: LinkResolution,
-  representation: ErrorRepresentation,
+  representation: Representation,
 ): FastifyReply {
   switch (resolution.state) {
     case "active":
       return replyWithRedirect(reply, resolution.longUrl);
+    case "sandboxed":
+      return replyWithContent(
+        reply,
+        200,
+        representation.contentType,
+        representation.sandboxed(new URL(resolution.longUrl)),
+      );
     case "deleted":
-      return replyWithError(reply, 410, representation.contentType, representation.gone);
+      return replyWithContent(reply, 410, representation.contentType, representation.gone);
     case "missing":
-      return replyWithError(reply, 404, representation.contentType, representation.notFound);
+      return replyWithContent(reply, 404, representation.contentType, representation.notFound);
   }
 }
 
-export function replyWithError(
+export function replyWithContent(
   reply: FastifyReply,
   statusCode: number,
   contentType: string,

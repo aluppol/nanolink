@@ -2,7 +2,7 @@
   "name": "nanolink-redirect",
   "version": "1.0.0",
   "private": true,
-  "description": "NanoLink redirect service: short code to 302 through a read-through cache",
+  "description": "NanoLink redirect service: short code to 302, or to a confirmation page for sandbox links, through a read-through cache",
   "license": "AGPL-3.0-only",
   "author": "Albert Luppol",
   "type": "module",

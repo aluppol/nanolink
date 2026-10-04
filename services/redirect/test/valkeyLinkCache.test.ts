@@ -12,6 +12,7 @@ import {
   DELETED_LINK,
   type LinkResolution,
   MISSING_LINK,
+  sandboxedLink,
 } from "../src/domain/linkResolution.js";
 import { type Case, mismatchesOf } from "./support/cases.js";
 import {
@@ -24,9 +25,10 @@ import {
 const DEADLINE_MILLISECONDS = 20;
 
 const STORED = new InMemoryKeyValueStore({
-  "link:aB3xY9": '{"state":"active","long_url":"https://example.org/"}',
-  "link:dE1eT3": '{"state":"deleted"}',
-  "link:mI55nG": '{"state":"missing"}',
+  "link:aB3xY9": '{"version":2,"state":"active","long_url":"https://example.org/"}',
+  "link:sAndB0": '{"version":2,"state":"sandboxed","long_url":"https://example.org/"}',
+  "link:dE1eT3": '{"version":2,"state":"deleted"}',
+  "link:mI55nG": '{"version":2,"state":"missing"}',
   "link:bR0k3n": "{not json",
 });
 
@@ -40,6 +42,11 @@ const LOOKUP_CASES: readonly Case<LookupInput, CacheLookup>[] = [
     id: "active entry is a hit",
     input: { store: STORED, shortCode: "aB3xY9" },
     expected: cacheHit(activeLink("https://example.org/")),
+  },
+  {
+    id: "sandboxed entry is a hit",
+    input: { store: STORED, shortCode: "sAndB0" },
+    expected: cacheHit(sandboxedLink("https://example.org/")),
   },
   {
     id: "deleted entry is a hit",
@@ -85,7 +92,18 @@ const STORE_CASES: readonly Case<CacheWrite, KeyValueWrite[]>[] = [
     expected: [
       {
         key: "link:aB3xY9",
-        value: '{"state":"active","long_url":"https://example.org/"}',
+        value: '{"version":2,"state":"active","long_url":"https://example.org/"}',
+        seconds: 300,
+      },
+    ],
+  },
+  {
+    id: "sandboxed is written for 300 s",
+    input: { shortCode: "sAndB0", resolution: sandboxedLink("https://example.org/") },
+    expected: [
+      {
+        key: "link:sAndB0",
+        value: '{"version":2,"state":"sandboxed","long_url":"https://example.org/"}',
         seconds: 300,
       },
     ],
@@ -93,12 +111,12 @@ const STORE_CASES: readonly Case<CacheWrite, KeyValueWrite[]>[] = [
   {
     id: "deleted is written for 3600 s",
     input: { shortCode: "dE1eT3", resolution: DELETED_LINK },
-    expected: [{ key: "link:dE1eT3", value: '{"state":"deleted"}', seconds: 3600 }],
+    expected: [{ key: "link:dE1eT3", value: '{"version":2,"state":"deleted"}', seconds: 3600 }],
   },
   {
     id: "missing is written for 30 s",
     input: { shortCode: "mI55nG", resolution: MISSING_LINK },
-    expected: [{ key: "link:mI55nG", value: '{"state":"missing"}', seconds: 30 }],
+    expected: [{ key: "link:mI55nG", value: '{"version":2,"state":"missing"}', seconds: 30 }],
   },
 ];
 

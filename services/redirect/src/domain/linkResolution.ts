@@ -1,7 +1,8 @@
-export type LinkState = "active" | "deleted" | "missing";
+export type LinkState = "active" | "sandboxed" | "deleted" | "missing";
 
 export type LinkResolution =
   | { readonly state: "active"; readonly longUrl: string }
+  | { readonly state: "sandboxed"; readonly longUrl: string }
   | { readonly state: "deleted" }
   | { readonly state: "missing" };
 
@@ -11,4 +12,8 @@ export const MISSING_LINK: LinkResolution = { state: "missing" };
 
 export function activeLink(longUrl: string): LinkResolution {
   return { state: "active", longUrl };
+}
+
+export function sandboxedLink(longUrl: string): LinkResolution {
+  return { state: "sandboxed", longUrl };
 }

@@ -1,7 +1,7 @@
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { LinkResolution } from "../domain/linkResolution.js";
 import type { LinkResolver } from "../domain/linkResolver.js";
-import { replyWithError, replyWithResolution } from "./replies.js";
+import { replyWithContent, replyWithResolution } from "./replies.js";
 import { representationFor } from "./representations.js";
 
 interface LinkRequest {
@@ -17,7 +17,7 @@ export function registerRedirectRoutes(server: FastifyInstance, resolver: LinkRe
 
 export function replyNotFound(request: FastifyRequest, reply: FastifyReply): FastifyReply {
   const representation = representationFor(request.headers.accept);
-  return replyWithError(reply, 404, representation.contentType, representation.notFound);
+  return replyWithContent(reply, 404, representation.contentType, representation.notFound);
 }
 
 async function answerLinkRequest(
@@ -28,7 +28,7 @@ async function answerLinkRequest(
   const representation = representationFor(request.headers.accept);
   const resolution = await resolveReportingFailure(resolver, request.params.code, request.log);
   if (resolution === undefined) {
-    return replyWithError(reply, 503, representation.contentType, representation.unavailable);
+    return replyWithContent(reply, 503, representation.contentType, representation.unavailable);
   }
   return replyWithResolution(reply, resolution, representation);
 }

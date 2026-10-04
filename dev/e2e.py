@@ -102,6 +102,26 @@ async def guest_sandbox() -> str:
     return f"the guest sees the {len(codes)} sandbox links"
 
 
+async def sandbox_links_ask_first() -> str:
+    guest = await signed_in("guest")
+    long_url = f"https://example.com/e2e/{uuid.uuid4().hex}"
+    accepted = await guest.post("/api/links", json={"long_url": long_url})
+    assert accepted.status_code == 202, accepted.text
+    link = (await polled_result(guest, accepted.json()["task_id"]))["link"]
+    assert isinstance(link, dict)
+    code = link["short_code"]
+    page = await guest.get(f"/{code}", headers={"Accept": "text/html"})
+    assert (page.status_code, page.headers.get("location")) == (200, None), page.status_code
+    assert f'href="{long_url}"' in page.text, page.text
+    policy = page.headers.get("content-security-policy", "")
+    assert policy.startswith("default-src 'none'"), policy
+    assert "'self'" not in policy, policy
+    answer = await guest.get(f"/{code}")
+    assert (answer.status_code, answer.json()) == (200, {"long_url": long_url}), answer.text
+    await guest.aclose()
+    return f"the guest's link {code} shows its destination instead of redirecting"
+
+
 async def input_rules() -> str:
     alice = await signed_in("alice")
     for bad_url in (
@@ -121,10 +141,16 @@ async def input_rules() -> str:
 
 async def main() -> int:
     failures = 0
-    for step in (owner_lifecycle, isolation_between_owners, guest_sandbox, input_rules):
+    for step in (
+        owner_lifecycle,
+        isolation_between_owners,
+        guest_sandbox,
+        sandbox_links_ask_first,
+        input_rules,
+    ):
         try:
             sys.stdout.write(f"ok   {step.__name__}: {await step()}\n")
-        except (AssertionError, httpx.HTTPError, KeyError, TimeoutError) as error:
+        except (AssertionError, httpx.HTTPError, KeyError, TimeoutError, ValueError) as error:
             failures += 1
             sys.stdout.write(f"FAIL {step.__name__}: {error!r}\n")
     return 1 if failures else 0
