@@ -4,7 +4,7 @@ NanoLink is a URL shortener built as a small distributed system. Link creation i
 
 Nine hardened containers, all non-root and read-only, run within a 1.25 GB memory budget. Sign-in is Keycloak (OpenID Connect) through oauth2-proxy, and the application still checks every access token itself.
 
-- **Status:** feature-complete and tested locally (unit, integration, smoke and end-to-end). CI is configured and runs from the first push of `dev`. Deployment to `https://nanolink.luppol.com` (demo server, guest login) waits for the server side of the pipeline.
+- **Status:** live at [nanolink.luppol.com](https://nanolink.luppol.com) on the demo server since 2026-09-24; sign in with *Continue as guest*. Every push to `dev` runs the tests and the stack in CI, and a green `dev` commit pushed to `main` deploys itself.
 - **Source:** [github.com/aluppol/nanolink](https://github.com/aluppol/nanolink) · License: AGPL-3.0
 
 <p>
