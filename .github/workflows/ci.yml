@@ -52,9 +52,19 @@ jobs:
         run: pytest
       - name: Known advisories
         run: pip-audit --disable-pip --require-hashes -r requirements.lock --progress-spinner off
-      - name: Start MongoDB, NATS and Valkey from deploy/compose.yaml
+      - name: Pull Docker Hub images through mirror.gcr.io
         working-directory: .
         run: |
+          [ -f /etc/docker/daemon.json ] || echo '{}' | sudo tee /etc/docker/daemon.json > /dev/null
+          jq '. + {"registry-mirrors": ["https://mirror.gcr.io"]}' /etc/docker/daemon.json > "$RUNNER_TEMP/daemon.json"
+          sudo cp "$RUNNER_TEMP/daemon.json" /etc/docker/daemon.json
+          sudo systemctl restart docker
+          docker info --format 'registry mirrors: {{json .RegistryConfig.Mirrors}}'
+      - name: Start MongoDB, NATS and Valkey from deploy/compose.yaml
+        id: services
+        working-directory: .
+        run: |
+          exec > >(tee "$RUNNER_TEMP/services.log") 2>&1
           docker build --quiet --tag nanolink/backend:ci services/backend
           docker build --quiet --tag nanolink/queue:ci services/queue
           docker build --quiet --tag nanolink/cache:ci services/cache
@@ -66,6 +76,10 @@ jobs:
           IMAGE_WEB=unused IMAGE_REDIRECT=unused IMAGE_BACKEND=nanolink/backend:ci IMAGE_QUEUE=nanolink/queue:ci \
             IMAGE_CACHE=nanolink/cache:ci docker compose -p it -f deploy/compose.yaml -f dev/compose.test.yaml \
             up --detach --wait --wait-timeout 180 migrate cache
+      - name: Say why the services did not start
+        if: failure() && steps.services.outcome == 'failure'
+        run: |
+          echo "::error title=services did not start::$(tail -n 25 "$RUNNER_TEMP/services.log" | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"
       - name: Integration tests
         run: |
           set -a
@@ -277,10 +291,24 @@ jobs:
           grep -E '^[A-Z][A-Z0-9_]*=__GENERATE__$' deploy/env.example | cut -d= -f1 | while read -r name; do
             printf '%s=%s\n' "$name" "$(openssl rand -hex 32)"
           done > deploy/.env
-      - name: Start the stack with the development sign-in in front
+      - name: Pull Docker Hub images through mirror.gcr.io
+        working-directory: .
         run: |
+          [ -f /etc/docker/daemon.json ] || echo '{}' | sudo tee /etc/docker/daemon.json > /dev/null
+          jq '. + {"registry-mirrors": ["https://mirror.gcr.io"]}' /etc/docker/daemon.json > "$RUNNER_TEMP/daemon.json"
+          sudo cp "$RUNNER_TEMP/daemon.json" /etc/docker/daemon.json
+          sudo systemctl restart docker
+          docker info --format 'registry mirrors: {{json .RegistryConfig.Mirrors}}'
+      - name: Start the stack with the development sign-in in front
+        id: start
+        run: |
+          exec > >(tee "$RUNNER_TEMP/stack.log") 2>&1
           docker network create nanolink_back
           docker compose --env-file "$IMAGES_ENV" up --detach --wait --wait-timeout 300
+      - name: Say why the stack did not start
+        if: failure() && steps.start.outcome == 'failure'
+        run: |
+          echo "::error title=e2e stack did not start::$(tail -n 25 "$RUNNER_TEMP/stack.log" | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')"
       - name: Sign in, create through the queue, follow, change, delete; owners, admin, guest sandbox
         run: |
           docker compose --env-file "$IMAGES_ENV" exec -T web demo-reset
