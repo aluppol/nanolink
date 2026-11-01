@@ -2,7 +2,7 @@
   "name": "nanolink-redirect",
   "version": "1.0.0",
   "private": true,
-  "description": "NanoLink redirect service: short code to 302, or to a confirmation page for sandbox links, through a read-through cache",
+  "description": "NanoLink redirect service: short code to 302 for links an admin wrote, to a confirmation page for every other link, through a read-through cache",
   "license": "AGPL-3.0-only",
   "author": "Albert Luppol",
   "type": "module",
@@ -21,7 +21,7 @@
     "check": "npm run lint && npm run typecheck && npm run check:comments && npm run test"
   },
   "dependencies": {
-    "fastify": "^5.12.5",
+    "fastify": "^5.12.7",
     "ioredis": "^6.0.0",
     "mongodb": "^7.6.0"
   },
