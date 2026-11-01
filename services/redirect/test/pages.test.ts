@@ -3,14 +3,18 @@ import { test } from "node:test";
 import { confirmationPage } from "../src/http/pages.js";
 import { type Case, mismatchesOf } from "./support/cases.js";
 
+const CONTINUE_REL = "noopener noreferrer nofollow ugc";
+
 interface ShownLink {
+  readonly headingHost: string | undefined;
   readonly shown: string | undefined;
   readonly href: string | undefined;
-  readonly host: string | undefined;
+  readonly rel: string | undefined;
+  readonly buttonHost: string | undefined;
 }
 
 function shownAs(address: string, host: string): ShownLink {
-  return { shown: address, href: address, host };
+  return { headingHost: host, shown: address, href: address, rel: CONTINUE_REL, buttonHost: host };
 }
 
 const CASES: readonly Case<string, ShownLink>[] = [
@@ -54,12 +58,25 @@ const CASES: readonly Case<string, ShownLink>[] = [
 function linkShownBy(address: string): ShownLink {
   const page = confirmationPage(new URL(address));
   return {
+    headingHost: /<h1>You are leaving NanoLink for <span class="host">(.*?)<\/span><\/h1>/.exec(
+      page,
+    )?.[1],
     shown: /<code>(.*?)<\/code>/.exec(page)?.[1],
     href: /<a class="continue" href="(.*?)"/.exec(page)?.[1],
-    host: /<span class="host">(.*?)<\/span>/.exec(page)?.[1],
+    rel: /<a class="continue" href=".*?" rel="(.*?)">/.exec(page)?.[1],
+    buttonHost: /Continue to <span class="host">(.*?)<\/span><\/a>/.exec(page)?.[1],
   };
 }
 
-test("confirmationPage shows and links the normalized long URL, escaped", async () => {
+test("confirmationPage names the host and shows and links the normalized long URL, escaped", async () => {
   assert.deepEqual(await mismatchesOf(CASES, linkShownBy), []);
+});
+
+test("confirmationPage never moves on by itself", () => {
+  const page = confirmationPage(new URL("https://example.org/path"));
+  assert.deepEqual(
+    page.match(/<script|<form|<iframe|<object|<embed|http-equiv|onload|onclick/gi),
+    null,
+  );
+  assert.equal(page.match(/href="https:\/\/example\.org\/path"/g)?.length, 1);
 });

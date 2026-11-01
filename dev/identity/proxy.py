@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import secrets
 import time
 from typing import Any
@@ -34,6 +35,10 @@ HOP_BY_HOP = frozenset(
     }
 )
 NOT_FORWARDED = HOP_BY_HOP | {TOKEN_HEADER}
+PUBLIC_METHODS = frozenset({"GET", "HEAD"})
+PUBLIC_SHORT_LINK_PATH = re.compile(
+    r"^/(?:[0-9A-Zb-npqs-z][0-9A-Za-z]{5}|a(?:[0-9A-Za-rt-z][0-9A-Za-z]{4}|s[0-9A-Za-rt-z][0-9A-Za-z]{3}|ss[0-9A-Za-df-z][0-9A-Za-z]{2}|sse[0-9A-Za-su-z][0-9A-Za-z]|sset[0-9A-Za-rt-z])|o(?:[0-9A-Zb-z][0-9A-Za-z]{4}|a[0-9A-Za-tv-z][0-9A-Za-z]{3}|au[0-9A-Za-su-z][0-9A-Za-z]{2}|aut[0-9A-Za-gi-z][0-9A-Za-z]|auth[013-9A-Za-z])|r(?:[0-9A-Za-df-z][0-9A-Za-z]{4}|e[0-9A-Zb-z][0-9A-Za-z]{3}|ea[0-9A-Za-ce-z][0-9A-Za-z]{2}|ead[0-9A-Za-xz][0-9A-Za-z]|eady[0-9A-Za-y]))$"
+)
 DEV_USERS: dict[str, dict[str, Any]] = {
     "alice": {"sub": "0b7d4c1e-0000-4000-8000-00000000a11c", "roles": ["USER"], "email": "alice@example.org"},
     "bob": {"sub": "0b7d4c1e-0000-4000-8000-000000000b0b", "roles": ["USER"], "email": "bob@example.org"},
@@ -110,14 +115,24 @@ async def sign_out() -> Response:
 
 @app.api_route("/{path:path}", methods=["GET", "HEAD", "POST", "PATCH", "PUT", "DELETE"])
 async def forward(request: Request, path: str) -> Response:
+    if is_public_short_link(request.method, request.url.path):
+        return await relayed(request, path, {})
     username, session_id = request.cookies.get(USER_COOKIE), request.cookies.get(SESSION_COOKIE)
     if username not in DEV_USERS or not session_id:
         return signed_out_answer(path)
+    return await relayed(request, path, {TOKEN_HEADER: access_token(username, session_id)})
+
+
+def is_public_short_link(method: str, path: str) -> bool:
+    return method in PUBLIC_METHODS and PUBLIC_SHORT_LINK_PATH.fullmatch(path) is not None
+
+
+async def relayed(request: Request, path: str, identity: dict[str, str]) -> Response:
     headers = {
         name.lower(): value for name, value in request.headers.items() if name.lower() not in NOT_FORWARDED
     }
     headers.setdefault("accept-encoding", "identity")
-    headers[TOKEN_HEADER] = access_token(username, session_id)
+    headers.update(identity)
     outgoing = upstream.build_request(
         request.method, f"/{path}", params=request.query_params, headers=headers, content=await request.body()
     )

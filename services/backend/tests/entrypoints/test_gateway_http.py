@@ -256,6 +256,31 @@ def test_readiness_reports_a_missing_dependency() -> None:
     assert (response.status_code, response.json()) == (503, {"status": "not_ready"})
 
 
+def test_only_an_admin_token_writes_links_that_redirect_straight() -> None:
+    fakes = Fakes()
+    with client_for(fakes) as client:
+        admin_old = fakes.links.add_active(
+            LinkDraft("t-old", "AdminO", "https://example.com/o", ADMIN.subject)
+        )
+        for token in ("admin", "alice", "guest"):
+            client.post(
+                "/api/links",
+                json={"long_url": f"https://example.com/by-{token}"},
+                headers={ACCESS_TOKEN_HEADER: token},
+            )
+        creation = BatchLinkCreation(
+            fakes.links, ScriptedCodes(("Admin1", "Alice1", "Guest1")), fakes.ledger, RecordingResults()
+        )
+        client.portal.call(creation.process, fakes.queue.tasks)
+        for token, link_id in (("alice", ALICE_ID), ("admin", admin_old.id)):
+            client.patch(
+                f"/api/links/{link_id}",
+                json={"long_url": "https://example.com/re-pointed"},
+                headers={ACCESS_TOKEN_HEADER: token},
+            )
+    assert fakes.links.trusted_codes() == {"Admin1", "AdminO"}
+
+
 def test_a_submitted_link_can_be_followed_to_its_result() -> None:
     fakes = Fakes()
     with client_for(fakes) as client:

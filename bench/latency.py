@@ -37,7 +37,7 @@ def describe(samples: list[float], elapsed: float) -> str:
 
 def main() -> int:
     if not SHORT_CODE:
-        sys.stderr.write("set SHORT_CODE to a link made by a member; sandbox links do not redirect\n")
+        sys.stderr.write("set SHORT_CODE to a link an admin made; other links do not redirect\n")
         return 2
     with httpx.Client(base_url=BASE_URL, follow_redirects=False, timeout=10) as client:
         for _ in range(WARM_UP_REQUESTS):

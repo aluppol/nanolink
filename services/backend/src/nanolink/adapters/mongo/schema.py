@@ -23,6 +23,7 @@ LINKS_VALIDATOR: Document = {
             "short_code": {"bsonType": "string", "pattern": "^[0-9A-Za-z]{6}$"},
             "long_url": {"bsonType": "string", "minLength": 1, "maxLength": 2048},
             "owner_id": {"bsonType": "string", "pattern": "^[A-Za-z0-9_-]{1,64}$"},
+            "trusted": {"bsonType": "bool"},
             "task_id": {"bsonType": "string", "minLength": 1},
             "created_at": {"bsonType": "date"},
             "updated_at": {"bsonType": "date"},

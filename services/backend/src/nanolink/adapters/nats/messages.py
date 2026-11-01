@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, StrictBool, ValidationError
 
 from nanolink.domain.links import Link
 from nanolink.domain.tasks import CreateLinkTask, TaskReport, TaskResult, TaskStatus
@@ -15,6 +15,7 @@ class TaskMessage(_Message):
     owner_id: str
     long_url: str
     notify_email: str | None
+    trusted: StrictBool = False
 
 
 class LinkMessage(_Message):
@@ -37,7 +38,11 @@ class ResultMessage(_Message):
 
 def encode_task(task: CreateLinkTask) -> bytes:
     message = TaskMessage(
-        task_id=task.task_id, owner_id=task.owner_id, long_url=task.long_url, notify_email=task.notify_email
+        task_id=task.task_id,
+        owner_id=task.owner_id,
+        long_url=task.long_url,
+        notify_email=task.notify_email,
+        trusted=task.is_trusted,
     )
     return message.model_dump_json().encode()
 
@@ -47,7 +52,9 @@ def decode_task(payload: bytes) -> CreateLinkTask | None:
         message = TaskMessage.model_validate_json(payload)
     except ValidationError:
         return None
-    return CreateLinkTask(message.task_id, message.owner_id, message.long_url, message.notify_email)
+    return CreateLinkTask(
+        message.task_id, message.owner_id, message.long_url, message.notify_email, message.trusted
+    )
 
 
 def encode_result(result: TaskResult) -> bytes:

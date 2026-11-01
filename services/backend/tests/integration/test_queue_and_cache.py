@@ -22,7 +22,9 @@ pytestmark = pytest.mark.integration
 
 
 async def test_tasks_are_stored_once_per_task_id(jetstream: JetStreamContext, owner_id: str) -> None:
-    task = CreateLinkTask(f"task-{uuid.uuid4().hex}", owner_id, "https://example.com/q", None)
+    task = CreateLinkTask(
+        f"task-{uuid.uuid4().hex}", owner_id, "https://example.com/q", None, is_trusted=True
+    )
     queue = JetStreamTaskQueue(jetstream)
     await queue.enqueue(task)
     await queue.enqueue(task)

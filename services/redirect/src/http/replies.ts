@@ -9,14 +9,14 @@ export function replyWithResolution(
   representation: Representation,
 ): FastifyReply {
   switch (resolution.state) {
-    case "active":
+    case "trusted":
       return replyWithRedirect(reply, resolution.longUrl);
-    case "sandboxed":
+    case "untrusted":
       return replyWithContent(
         reply,
         200,
         representation.contentType,
-        representation.sandboxed(new URL(resolution.longUrl)),
+        representation.confirmation(new URL(resolution.longUrl)),
       );
     case "deleted":
       return replyWithContent(reply, 410, representation.contentType, representation.gone);

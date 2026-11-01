@@ -14,6 +14,7 @@ from nanolink.domain.tasks import (
     TaskStatus,
 )
 from tests.support import (
+    ADMIN,
     ALICE,
     BOB,
     InMemoryLinks,
@@ -29,6 +30,7 @@ TASK_A_TWIN = CreateLinkTask("task-a-twin", ALICE.subject, URL_A, ALICE.email)
 TASK_B = CreateLinkTask("task-b", BOB.subject, URL_A, BOB.email)
 TASK_LOCAL = CreateLinkTask("task-local", ALICE.subject, "http://localhost/admin", ALICE.email)
 TASK_BAD_OWNER = CreateLinkTask("task-bad-owner", "not.an owner", URL_A, None)
+TASK_ADMIN = CreateLinkTask("task-admin", ADMIN.subject, URL_A, None, is_trusted=True)
 
 Outcome = tuple[str, str]
 
@@ -43,6 +45,7 @@ class Case:
     deleted: tuple[LinkDraft, ...] = ()
     inserts: int = 1
     results: int = field(default=-1)
+    trusted: frozenset[str] = frozenset()
 
 
 CASES = [
@@ -120,6 +123,28 @@ CASES = [
         {"task-bad-owner": ("failed", INVALID_OWNER)},
         inserts=0,
     ),
+    Case(
+        "an admin's task creates a link that redirects straight",
+        (TASK_ADMIN,),
+        ("Admin1",),
+        {"task-admin": ("created", "Admin1")},
+        trusted=frozenset({"Admin1"}),
+    ),
+    Case(
+        "an admin's task reuses an older link of theirs as it is",
+        (TASK_ADMIN,),
+        (),
+        {"task-admin": ("created", "Old009")},
+        active=(LinkDraft("older", "Old009", URL_A, ADMIN.subject),),
+        inserts=0,
+    ),
+    Case(
+        "an admin's and a member's tasks in one batch",
+        (TASK_ADMIN, TASK_B),
+        ("Admin1", "Code02"),
+        {"task-admin": ("created", "Admin1"), "task-b": ("created", "Code02")},
+        trusted=frozenset({"Admin1"}),
+    ),
 ]
 
 
@@ -142,8 +167,14 @@ async def run_case(case: Case) -> str | None:
     ledger, results = InMemoryTaskLedger(), RecordingResults()
     await BatchLinkCreation(links, ScriptedCodes(case.codes), ledger, results).process(case.tasks)
     expected_results = len(case.expected) if case.results < 0 else case.results
-    actual = (outcomes_of(results), links.insert_calls, len(results.results), set(ledger.records))
-    expected = (case.expected, case.inserts, expected_results, set(case.expected))
+    actual = (
+        outcomes_of(results),
+        links.insert_calls,
+        len(results.results),
+        set(ledger.records),
+        links.trusted_codes(),
+    )
+    expected = (case.expected, case.inserts, expected_results, set(case.expected), case.trusted)
     return None if actual == expected else f"{case.id}:\n  expected {expected}\n  got      {actual}"
 
 

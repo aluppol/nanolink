@@ -39,6 +39,10 @@ class Principal:
         return Role.ADMIN in self.roles and not self.is_guest
 
     @property
+    def writes_trusted_links(self) -> bool:
+        return self.is_admin
+
+    @property
     def owner_id(self) -> str:
         return SANDBOX_OWNER_ID if self.is_guest else self.subject
 

@@ -18,6 +18,9 @@ ADMIN = Principal("admin-0003", "admin", None, frozenset({Role.ADMIN}))
 GUEST = Principal("guest-0004", "guest", "recruiter@example.org", frozenset({Role.GUEST}))
 GUEST_IN_SESSION = Principal("guest-0004", "guest", None, frozenset({Role.GUEST}), "session-1")
 GUEST_IN_OTHER_SESSION = Principal("guest-0004", "guest", None, frozenset({Role.GUEST}), "session-2")
+ADMIN_WHO_IS_ALSO_GUEST = Principal(
+    "mixed-0005", "mixed", "m@example.org", frozenset({Role.ADMIN, Role.GUEST})
+)
 
 
 def report_mismatches(mismatches: Sequence[str]) -> None:
@@ -29,6 +32,7 @@ class StoredLink:
     link: Link
     task_id: str
     is_deleted: bool
+    is_trusted: bool
 
 
 class InMemoryLinks:
@@ -39,16 +43,19 @@ class InMemoryLinks:
 
     def add_active(self, draft: LinkDraft) -> Link:
         link = self._link_for(draft)
-        self.rows.append(StoredLink(link, draft.task_id, is_deleted=False))
+        self.rows.append(StoredLink(link, draft.task_id, is_deleted=False, is_trusted=draft.is_trusted))
         return link
 
     def add_deleted(self, draft: LinkDraft) -> Link:
         link = self._link_for(draft)
-        self.rows.append(StoredLink(link, draft.task_id, is_deleted=True))
+        self.rows.append(StoredLink(link, draft.task_id, is_deleted=True, is_trusted=draft.is_trusted))
         return link
 
     def active_links(self) -> list[Link]:
         return [row.link for row in self.rows if not row.is_deleted]
+
+    def trusted_codes(self) -> frozenset[str]:
+        return frozenset(row.link.short_code for row in self.rows if row.is_trusted and not row.is_deleted)
 
     async def find_owned(self, link_id: str, owner_id: str) -> Link | None:
         return next(
@@ -64,7 +71,7 @@ class InMemoryLinks:
     async def list_all(self, page: PageRequest) -> LinkPage:
         return _page(self.active_links(), page)
 
-    async def change_long_url(self, link_id: str, long_url: str) -> None:
+    async def change_long_url(self, link_id: str, long_url: str, *, is_trusted: bool) -> None:
         row = self._active_row(link_id)
         if row is None:
             return
@@ -74,6 +81,7 @@ class InMemoryLinks:
         ):
             raise DuplicateLongUrl
         row.link = replace(row.link, long_url=long_url)
+        row.is_trusted = is_trusted
 
     async def soft_delete(self, link_id: str) -> None:
         row = self._active_row(link_id)

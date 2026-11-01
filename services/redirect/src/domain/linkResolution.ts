@@ -1,8 +1,8 @@
-export type LinkState = "active" | "sandboxed" | "deleted" | "missing";
+export type LinkState = "trusted" | "untrusted" | "deleted" | "missing";
 
 export type LinkResolution =
-  | { readonly state: "active"; readonly longUrl: string }
-  | { readonly state: "sandboxed"; readonly longUrl: string }
+  | { readonly state: "trusted"; readonly longUrl: string }
+  | { readonly state: "untrusted"; readonly longUrl: string }
   | { readonly state: "deleted" }
   | { readonly state: "missing" };
 
@@ -10,10 +10,10 @@ export const DELETED_LINK: LinkResolution = { state: "deleted" };
 
 export const MISSING_LINK: LinkResolution = { state: "missing" };
 
-export function activeLink(longUrl: string): LinkResolution {
-  return { state: "active", longUrl };
+export function trustedLink(longUrl: string): LinkResolution {
+  return { state: "trusted", longUrl };
 }
 
-export function sandboxedLink(longUrl: string): LinkResolution {
-  return { state: "sandboxed", longUrl };
+export function untrustedLink(longUrl: string): LinkResolution {
+  return { state: "untrusted", longUrl };
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import type { FastifyInstance, InjectOptions } from "fastify";
-import { activeLink, DELETED_LINK, sandboxedLink } from "../src/domain/linkResolution.js";
+import { DELETED_LINK, trustedLink, untrustedLink } from "../src/domain/linkResolution.js";
 import { LinkResolver } from "../src/domain/linkResolver.js";
 import type { LinkSource } from "../src/domain/linkSource.js";
 import { PAGE_SECURITY_POLICY } from "../src/http/pages.js";
@@ -11,6 +11,14 @@ import { InMemoryLinkSource, READY_PROBE, UnreachableLinkSource } from "./suppor
 
 const BROWSER_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
 const JSON_ACCEPT = "application/json";
+const SIGNED_IN_ADMIN = {
+  accept: BROWSER_ACCEPT,
+  "x-forwarded-access-token": "header.payload.signature",
+  authorization: "Bearer header.payload.signature",
+  cookie: "__Host-nanolink=session",
+  "x-forwarded-user": "albert",
+  "x-forwarded-email": "albert@example.org",
+};
 
 interface Observed {
   readonly status: number;
@@ -21,9 +29,9 @@ interface Observed {
 }
 
 const LINKS = new InMemoryLinkSource({
-  aB3xY9: activeLink("https://example.org/path?q=1"),
-  uN1c0d: activeLink("https://exämple.org/ü"),
-  sAndB0: sandboxedLink("https://exämple.org/a?b=1&c=2"),
+  aB3xY9: trustedLink("https://example.org/path?q=1"),
+  uN1c0d: trustedLink("https://exämple.org/ü"),
+  uNtrst: untrustedLink("https://exämple.org/a?b=1&c=2"),
   dE1eT3: DELETED_LINK,
 });
 
@@ -43,8 +51,13 @@ function contentAnswer(status: number, body: string): Observed {
 
 const CASES: readonly Case<InjectOptions, Observed>[] = [
   {
-    id: "active code redirects with no-store",
+    id: "trusted code redirects with no-store",
     input: { method: "GET", url: "/aB3xY9", headers: { accept: BROWSER_ACCEPT } },
+    expected: { ...FOUND, location: "https://example.org/path?q=1" },
+  },
+  {
+    id: "trusted code redirects a request with no headers at all",
+    input: { method: "GET", url: "/aB3xY9" },
     expected: { ...FOUND, location: "https://example.org/path?q=1" },
   },
   {
@@ -63,19 +76,39 @@ const CASES: readonly Case<InjectOptions, Observed>[] = [
     expected: { ...FOUND, location: "https://xn--exmple-cua.org/%C3%BC" },
   },
   {
-    id: "sandboxed code shows browsers a confirmation page instead of redirecting",
-    input: { method: "GET", url: "/sAndB0", headers: { accept: BROWSER_ACCEPT } },
-    expected: contentAnswer(200, "html:Check where this link goes"),
+    id: "untrusted code shows browsers a confirmation page instead of redirecting",
+    input: { method: "GET", url: "/uNtrst", headers: { accept: BROWSER_ACCEPT } },
+    expected: contentAnswer(200, "html:You are leaving NanoLink for xn--exmple-cua.org"),
   },
   {
-    id: "sandboxed code gives API clients its long URL instead of redirecting",
-    input: { method: "GET", url: "/sAndB0", headers: { accept: JSON_ACCEPT } },
+    id: "untrusted code gives API clients its long URL instead of redirecting",
+    input: { method: "GET", url: "/uNtrst", headers: { accept: JSON_ACCEPT } },
     expected: contentAnswer(200, 'json:{"long_url":"https://xn--exmple-cua.org/a?b=1&c=2"}'),
   },
   {
-    id: "HEAD on a sandboxed code does not redirect either",
-    input: { method: "HEAD", url: "/sAndB0" },
+    id: "untrusted code answers a request with no headers at all with its long URL",
+    input: { method: "GET", url: "/uNtrst" },
+    expected: contentAnswer(200, 'json:{"long_url":"https://xn--exmple-cua.org/a?b=1&c=2"}'),
+  },
+  {
+    id: "HEAD on an untrusted code does not redirect either",
+    input: { method: "HEAD", url: "/uNtrst" },
     expected: contentAnswer(200, ""),
+  },
+  {
+    id: "a signed-in admin's identity headers do not make an untrusted code redirect",
+    input: { method: "GET", url: "/uNtrst", headers: SIGNED_IN_ADMIN },
+    expected: contentAnswer(200, "html:You are leaving NanoLink for xn--exmple-cua.org"),
+  },
+  {
+    id: "identity headers change nothing for a trusted code",
+    input: { method: "GET", url: "/aB3xY9", headers: SIGNED_IN_ADMIN },
+    expected: { ...FOUND, location: "https://example.org/path?q=1" },
+  },
+  {
+    id: "a confirmed variant of a short link does not exist",
+    input: { method: "GET", url: "/uNtrst/continue", headers: { accept: JSON_ACCEPT } },
+    expected: contentAnswer(404, 'json:{"error":"not_found"}'),
   },
   {
     id: "deleted code is 410 JSON for API clients",
@@ -142,7 +175,7 @@ const BROKEN_DATABASE_CASES: readonly Case<InjectOptions, Observed>[] = [
   },
 ];
 
-test("GET /:code answers 302, 200 for sandbox links, 404 or 410 as the client accepts", async () => {
+test("GET /:code answers 302 for trusted links, 200 for the rest, 404 or 410 as accepted", async () => {
   assert.deepEqual(await mismatchesOf(CASES, (request) => observe(HEALTHY_SERVER, request)), []);
 });
 
@@ -180,7 +213,8 @@ function summarize(contentType: string | undefined, body: string): string {
     return body;
   }
   if (contentType?.startsWith("text/html") === true) {
-    return `html:${/<h1>(.*?)<\/h1>/.exec(body)?.[1] ?? "no heading"}`;
+    const heading = /<h1>(.*?)<\/h1>/.exec(body)?.[1] ?? "no heading";
+    return `html:${heading.replace(/<[^>]*>/g, "")}`;
   }
   if (contentType?.startsWith("application/json") === true) {
     return `json:${JSON.stringify(JSON.parse(body))}`;

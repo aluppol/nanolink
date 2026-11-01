@@ -2,7 +2,7 @@
 
 NanoLink is a URL shortener built as a small distributed system. Link creation is asynchronous: an API gateway queues each request on NATS JetStream, a batch worker creates the links in MongoDB, and a notification service pushes the result to the browser. Clicks take a separate hot path: a Fastify redirect service reads through a Valkey cache and falls back to MongoDB when the cache is down.
 
-Nine hardened containers, all non-root and read-only, run within a 1.25 GB memory budget. Sign-in is Keycloak (OpenID Connect) through oauth2-proxy, and the application still checks every access token itself.
+Nine hardened containers, all non-root and read-only, run within a 1.25 GB memory budget. Sign-in is Keycloak (OpenID Connect) through oauth2-proxy, and the application still checks every access token itself. Short links are public: anyone can follow one without signing in.
 
 - **Status:** live at [nanolink.luppol.com](https://nanolink.luppol.com) on the demo server since 2026-09-24; sign in with *Continue as guest*. Every push to `dev` runs the tests and the stack in CI, and a green `dev` commit pushed to `main` deploys itself.
 - **Source:** [github.com/aluppol/nanolink](https://github.com/aluppol/nanolink) · License: AGPL-3.0
@@ -18,7 +18,7 @@ Nine hardened containers, all non-root and read-only, run within a 1.25 GB memor
 
 ```mermaid
 flowchart LR
-    browser([Browser]) --> edge["Caddy + oauth2-proxy<br/>sign-in at auth.luppol.com"]
+    browser([Browser]) --> edge["Caddy + oauth2-proxy<br/>sign-in at auth.luppol.com<br/>(short links pass without it)"]
     edge --> web["web<br/>nginx + UI"]
     web -- "/api/*" --> gateway["gateway<br/>FastAPI"]
     web -- "/api/notifications (SSE)" --> notifier["notifier<br/>FastAPI"]
@@ -41,7 +41,7 @@ flowchart LR
 | `creator` | Python 3.12 | Create URL service: pulls tasks in batches, inserts links with collision retry, publishes results | 96 MiB |
 | `notifier` | Python 3.12, FastAPI | Notification service: pushes results to the creator over Server-Sent Events, and by e-mail when SMTP is configured | 96 MiB |
 | `migrate` | Python 3.12 | creates database users, validators, indexes, streams and consumers, then stays up as a readiness marker | 96 MiB |
-| `redirect` | TypeScript, Node 24, Fastify 5 | redirect hot path: read-through cache, `302` / `410` / `404`; sandbox links get a confirmation page | 128 MiB |
+| `redirect` | TypeScript, Node 24, Fastify 5 | redirect hot path: read-through cache; `302` for links an admin wrote, a confirmation page for every other link, `410` / `404` | 128 MiB |
 | `mongo` | MongoDB 7.0 | link and task storage (WiredTiger cache capped at 256 MiB) | 448 MiB |
 | `queue` | NATS 2.12 JetStream | the distributed queue; its file store is the log disk | 64 MiB |
 | `cache` | Valkey 8.1 | 32 MiB LRU cache, no persistence | 48 MiB |
@@ -58,13 +58,15 @@ The four Python services are one codebase and one image. Each runs its own entry
 ### Serving a click
 
 `GET /{code}` → redirect service → Valkey `link:<code>`:
-- On a hit it answers straight away: `302` with the target, `200` with the target for a sandbox link (below), `410` for a deleted link, or `404` for an unknown code.
-- On a miss it reads MongoDB and caches the answer. Active and sandbox links are cached for 5 minutes, deleted ones for 1 hour, unknown codes for 30 seconds, which stops floods of unknown codes from reaching the database.
+- On a hit it answers straight away: `302` for a link an admin wrote, `200` with the target for every other link (below), `410` for a deleted link, or `404` for an unknown code.
+- On a miss it reads MongoDB and caches the answer. Live links are cached for 5 minutes, deleted ones for 1 hour, unknown codes for 30 seconds, which stops floods of unknown codes from reaching the database.
 - If Valkey is slow or down (50 ms deadline), it reads MongoDB directly.
 
 Browsers get small HTML pages; other clients get JSON.
 
-**Sandbox links never redirect.** Anyone can sign in as the shared guest, so a redirect from a sandbox link would make NanoLink an open redirector for phishing. Every link in the sandbox, the seeded ones included (any guest can re-point them), answers `200` with its target: browsers get a page that shows the full address, the host in punycode, and a *Continue* link to it; other clients get `{"long_url": …}`. No variant of a short link redirects after a confirmation, since sharing that variant would bring the open redirect back. Members' links redirect as before.
+**Short links are public.** The login gateway lets anonymous `GET` and `HEAD` of a short-link path through and nothing else (the exact pattern is under [Security](#security)). The redirect service never looks at who is asking, and its answers carry only the target, never who owns the link.
+
+**Only links an admin wrote redirect straight.** Anyone can sign in as the shared guest or register an account, so a redirect from their links would make NanoLink an open redirector for phishing on a personal domain. When a link is created or re-pointed, the gateway records whether the caller's token carries the realm role `ADMIN` (the `trusted` field); only such links answer `302`. Every other link (members', the guest sandbox's and the seeded ones) answers `200` with its target: browsers get a *You are leaving NanoLink* page that shows the destination host and the full address (the host in punycode) and a *Continue* link to it, and other clients get `{"long_url": …}`. Nothing moves on by itself, and no variant of a short link redirects after a confirmation, since sharing that variant would bring the open redirect back. A sandbox link never redirects, whatever its `trusted` field says. Links stored before the field existed count as untrusted; an admin makes one of theirs redirect by re-pointing it, even to the same address.
 
 The gateway deletes the cache entry whenever a link changes or is deleted. A redirect that read the old value just before the change can put it back, so a stale target can live at most 5 minutes.
 
@@ -98,16 +100,16 @@ open http://127.0.0.1:8088
 dev/down.sh      # stops it; add --volumes to drop the data
 ```
 
-Locally, a small development proxy (`dev/identity/proxy.py`) plays the part of oauth2-proxy and Keycloak. It signs short-lived tokens with its own key and lets you sign in as `alice`, `bob` (users), `admin` or `guest`. The services run exactly the production `deploy/compose.yaml`; only the token issuer, the public URL and the published port differ (`dev/compose.yaml`).
+Locally, a small development proxy (`dev/identity/proxy.py`) plays the part of oauth2-proxy and Keycloak. It signs short-lived tokens with its own key and lets you sign in as `alice`, `bob` (users), `admin` or `guest`, and like the server it passes `GET` and `HEAD` of a short link through without a sign-in. The services run exactly the production `deploy/compose.yaml`; only the token issuer, the public URL and the published port differ (`dev/compose.yaml`).
 
 ```bash
 docker run --rm -i --network nanolink_back nanolink/backend:dev python - < dev/e2e.py
 ```
-This end-to-end check signs in, creates a link through the queue and waits for the pushed result, follows the redirect, re-points and deletes the link, and checks owner isolation, the admin view, the guest sandbox, that a sandbox link shows its target instead of redirecting, that two guest sessions count their quota separately, and the input rules.
+This end-to-end check signs in, creates a link through the queue and waits for the pushed result, re-points and deletes it, and checks that an anonymous visitor is redirected straight only by an admin's link while members' and sandbox links show their target (to visitors, members and admins alike), that only short links are reachable without a sign-in, owner isolation, the admin view, the guest sandbox, that two guest sessions count their quota separately, and the input rules.
 
 ## API
 
-All `/api` routes need the access token (`X-Forwarded-Access-Token`, set by oauth2-proxy); short-code redirects do not. Errors are `{"error": code, "message": text}`.
+All `/api` routes need the access token (`X-Forwarded-Access-Token`, set by oauth2-proxy); short links are public and need nothing. Errors are `{"error": code, "message": text}`.
 
 | Route | Answer |
 |---|---|
@@ -118,7 +120,7 @@ All `/api` routes need the access token (`X-Forwarded-Access-Token`, set by oaut
 | `GET` / `PATCH {long_url}` / `DELETE /api/links/{id}` | one of your links; `409 duplicate_long_url` when you already have that target |
 | `GET /api/admin/links`, `DELETE /api/admin/links/{id}` | moderation, role `ADMIN` |
 | `GET /api/notifications` | Server-Sent Events, event `link-result` |
-| `GET /{code}` | `302` to the target (`200` with the target for a sandbox link), `410` deleted, `404` unknown |
+| `GET /{code}` | `302` to the target for a link an admin wrote, `200` with the target for every other link, `410` deleted, `404` unknown; public |
 
 The OpenAPI document is served at `/api/openapi.json`.
 
@@ -127,7 +129,10 @@ The OpenAPI document is served at `/api/openapi.json`.
 - **Tokens:** oauth2-proxy handles the login. The gateway and the notifier still verify every access token themselves: RS256 only, JWKS signature, `iss`, `aud` containing `nanolink`, `exp`, and `typ` = `Bearer`, so an ID token is refused. Roles come from `realm_access.roles`. Tests cover forged, expired, foreign-audience, algorithm-confusion (HS256 signed with the public key) and unsigned tokens.
 - **Object-level checks:** every link and task query is scoped to the caller. The guest role works in a shared sandbox; the `demo-reset` command, which the demo server runs nightly, wipes and reseeds it and restores its shared quota. Moderation needs `ADMIN`.
 - **Daily quotas:** 200 links per user, none for admins. Guests get 25 per sign-in session (the Keycloak `sid`), so one session cannot use up the demo for everyone, and 500 for the whole sandbox, which bounds what the public login can write in a day. Someone who keeps signing in again can still reach that cap; guests then get `429` until midnight UTC or the nightly reset. The counters live in Valkey without persistence, and while it is unreachable requests are let through rather than refused.
-- **No open redirect:** links made with the shared guest account show their target and wait for a click instead of redirecting ([Serving a click](#serving-a-click)). That page has its own strict CSP (no scripts, no framing) and escapes the address.
+- **No open redirect:** only links written by an account with the realm role `ADMIN` redirect; every other link shows its target and waits for a click ([Serving a click](#serving-a-click)). The trust is recorded on the link when it is written, never looked up at click time, and a link without it asks first. That page has its own strict CSP (no scripts, no framing), escapes the address, and its *Continue* link is `rel="noopener noreferrer nofollow ugc"`.
+- **Public short links, nothing else:** the login gateway skips the sign-in only for `GET` and `HEAD` of a path that is exactly a short code, written as one anchored pattern that also leaves out the reserved route words `assets`, `oauth2` and `readyz`:
+  `^/(?:[0-9A-Zb-npqs-z][0-9A-Za-z]{5}|a(?:[0-9A-Za-rt-z][0-9A-Za-z]{4}|s[0-9A-Za-rt-z][0-9A-Za-z]{3}|ss[0-9A-Za-df-z][0-9A-Za-z]{2}|sse[0-9A-Za-su-z][0-9A-Za-z]|sset[0-9A-Za-rt-z])|o(?:[0-9A-Zb-z][0-9A-Za-z]{4}|a[0-9A-Za-tv-z][0-9A-Za-z]{3}|au[0-9A-Za-su-z][0-9A-Za-z]{2}|aut[0-9A-Za-gi-z][0-9A-Za-z]|auth[013-9A-Za-z])|r(?:[0-9A-Za-df-z][0-9A-Za-z]{4}|e[0-9A-Zb-z][0-9A-Za-z]{3}|ea[0-9A-Za-ce-z][0-9A-Za-z]{2}|ead[0-9A-Za-xz][0-9A-Za-z]|eady[0-9A-Za-y]))$`
+  The redirect service reads no identity header, so a signed-in visitor gets exactly what an anonymous one gets.
 - **No server-side requests to user URLs:** NanoLink never fetches a submitted address, so there is no SSRF surface. It still refuses destinations that point into private space: non-http(s) schemes, embedded credentials, loopback, private, link-local and CGNAT addresses (including `169.254.169.254` and IPv4-mapped IPv6), numeric host forms such as `2130706433` or `0x7f.1`, single-label hosts, and internal top-level domains.
 - **Least privilege in the data layer:** the MongoDB users are `gateway` and `creator` (readWrite) and `redirect` (read only). A JSON-schema validator guards the `links` collection.
 - **Containers:** `cap_drop: [ALL]`, `no-new-privileges`, read-only root filesystems with a small `/tmp`, non-root users, memory and PID limits. The data and service networks are `internal` and have no route out. Of the application services only the gateway and the notifier also join a network with egress, for JWKS and SMTP; `web` joins the network the server's login gateway provides.
@@ -138,16 +143,16 @@ The OpenAPI document is served at `/api/openapi.json`.
 
 | Part | Checks | Tests |
 |---|---|---|
-| `services/backend` | `ruff` (lint + format), `mypy --strict`, house-rule check (no comments or docstrings, functions ≤ 30 lines), `pip-audit` | 48 contract tests (each unit a `CASES` table) + 12 integration tests against real MongoDB, NATS and Valkey |
-| `services/redirect` | Biome, `tsc` strict, comment check, `npm audit` | 19 contract tests (Fastify `inject` with in-memory ports) |
+| `services/backend` | `ruff` (lint + format), `mypy --strict`, house-rule check (no comments or docstrings, functions ≤ 30 lines), `pip-audit` | 51 contract tests (each unit a `CASES` table) + 14 integration tests against real MongoDB, NATS and Valkey |
+| `services/redirect` | Biome, `tsc` strict, comment check, `npm audit` | 21 contract tests (Fastify `inject` with in-memory ports) |
 | `services/web` | Biome, `tsc` strict, comment check, `npm audit` | 16 contract tests of the UI model; nginx `-t` at image build |
-| whole stack | `deploy/smoke.sh`: 12 HTTP checks against the production compose file; `dev/e2e.py`: the signed-in flows | CI jobs `stack` and `e2e` |
+| whole stack | `deploy/smoke.sh`: 12 HTTP checks against the production compose file; `dev/e2e.py`: the signed-in and anonymous flows | CI jobs `stack` and `e2e` |
 
 CI (`.github/workflows/ci.yml`) runs all of this on every push to `dev`, builds the five images, and brings the production compose file up with `--wait`. `main` is the deploy branch: a green `dev` commit pushed to it is deployed to the demo server by `.github/workflows/deploy.yml`.
 
 ## Benchmark
 
-Two scripts, both run in containers on the stack's network, so no host port forwarding sits in the path. The target is a member's link (locally, sign in as `alice` and shorten any URL), which takes the production route minus Caddy and oauth2-proxy: nginx → redirect → Valkey. Sandbox links do not redirect, so neither script has a default target. `latency.py` checks that every answer is a `302`; `redirect.sh` stops when its warm-up gets anything but redirects.
+Two scripts, both run in containers on the stack's network, so no host port forwarding sits in the path. The target is a link an admin made (locally, sign in as `admin` and shorten any URL), which takes the production route minus Caddy and oauth2-proxy: nginx → redirect → Valkey. Only admins' links redirect, so neither script has a default target. `latency.py` checks that every answer is a `302`; `redirect.sh` stops when its warm-up gets anything but redirects.
 
 **Latency on one keep-alive connection:** `docker run --rm -i --network nanolink_back -e SHORT_CODE=<code> nanolink/backend:dev python - < bench/latency.py`. It sends 200 warm-up and 2,000 measured sequential requests.
 
@@ -165,7 +170,7 @@ Two scripts, both run in containers on the stack's network, so no host port forw
 | 50 | 65,272 | 2,176 | 0 |
 | 100 | 80,391 | 2,680 | 0 |
 
-**Where it ran:** a 2019 MacBook Pro (Intel i9-9980HK, 8 cores) under Docker Desktop, 2026-09-24 03:45–03:52 UTC, against the seeded link `/Albert`, which still redirected then; a member's link takes the same path. The laptop was shared with other workloads: the load average moved between 6 and 36 during the runs, and throughput varied by up to 3.5× between runs. At 1 and 10 connections autocannon's latency histogram disagreed with its own throughput (Little's law), so latency comes from the sequential script. Treat these as a floor on a busy developer machine; the same scripts will run on the demo server.
+**Where it ran:** a 2019 MacBook Pro (Intel i9-9980HK, 8 cores) under Docker Desktop, 2026-09-24 03:45–03:52 UTC, against the seeded link `/Albert`, which still redirected then; an admin's link takes the same path. The laptop was shared with other workloads: the load average moved between 6 and 36 during the runs, and throughput varied by up to 3.5× between runs. At 1 and 10 connections autocannon's latency histogram disagreed with its own throughput (Little's law), so latency comes from the sequential script. Treat these as a floor on a busy developer machine; the same scripts will run on the demo server.
 
 ## Repository
 

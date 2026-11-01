@@ -71,7 +71,7 @@ class BatchLinkCreation:
         return {**by_task, **reused}
 
     def _draft(self, task: CreateLinkTask) -> LinkDraft:
-        return LinkDraft(task.task_id, self._codes.next_code(), task.long_url, task.owner_id)
+        return LinkDraft(task.task_id, self._codes.next_code(), task.long_url, task.owner_id, task.is_trusted)
 
 
 def _owner_url(task: CreateLinkTask) -> tuple[str, str]:

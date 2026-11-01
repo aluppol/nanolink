@@ -21,6 +21,7 @@ class LinkDraft:
     short_code: str
     long_url: str
     owner_id: str
+    is_trusted: bool = False
 
 
 @dataclass(frozen=True, slots=True)

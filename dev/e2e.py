@@ -6,6 +6,7 @@ import uuid
 import httpx
 
 BASE_URL = "http://devauth:8090"
+APP_URL = "http://web:8080"
 RESULT_TIMEOUT_SECONDS = 20.0
 
 
@@ -13,6 +14,10 @@ async def signed_in(username: str) -> httpx.AsyncClient:
     client = httpx.AsyncClient(base_url=BASE_URL, follow_redirects=False, timeout=10)
     await client.get(f"/__dev/login/{username}")
     return client
+
+
+def anonymous(base_url: str = BASE_URL) -> httpx.AsyncClient:
+    return httpx.AsyncClient(base_url=base_url, follow_redirects=False, timeout=10)
 
 
 async def polled_result(client: httpx.AsyncClient, task_id: str) -> dict[str, object]:
@@ -53,25 +58,84 @@ async def redirect_target(client: httpx.AsyncClient, short_code: str) -> tuple[i
     return response.status_code, response.headers.get("location")
 
 
+async def shown_target(client: httpx.AsyncClient, short_code: str) -> tuple[int, object]:
+    response = await client.get(f"/{short_code}")
+    shown = response.json().get("long_url") if response.status_code == 200 else None
+    return response.status_code, shown
+
+
+async def created_link(client: httpx.AsyncClient, long_url: str) -> dict[str, str]:
+    accepted = await client.post("/api/links", json={"long_url": long_url})
+    assert accepted.status_code == 202, accepted.text
+    link = (await polled_result(client, accepted.json()["task_id"]))["link"]
+    assert isinstance(link, dict), link
+    return link
+
+
 async def owner_lifecycle() -> str:
-    alice = await signed_in("alice")
+    alice, visitor = await signed_in("alice"), anonymous()
     long_url = f"https://example.com/e2e/{uuid.uuid4().hex}"
     report = await created_via_stream_and_task(alice, long_url)
     link = report["link"]
     assert isinstance(link, dict)
     code, link_id = link["short_code"], link["id"]
-    assert await redirect_target(alice, code) == (302, long_url)
+    assert await shown_target(visitor, code) == (200, long_url)
     again = await polled_result(
         alice, (await alice.post("/api/links", json={"long_url": long_url})).json()["task_id"]
     )
     assert again["link"]["short_code"] == code, again
     changed = await alice.patch(f"/api/links/{link_id}", json={"long_url": f"{long_url}/changed"})
     assert changed.status_code == 200, changed.text
-    assert await redirect_target(alice, code) == (302, f"{long_url}/changed")
+    assert await shown_target(visitor, code) == (200, f"{long_url}/changed")
     assert (await alice.delete(f"/api/links/{link_id}")).status_code == 204
-    assert (await redirect_target(alice, code))[0] == 410
-    await alice.aclose()
+    assert (await shown_target(visitor, code))[0] == 410
+    for client in (alice, visitor):
+        await client.aclose()
     return f"created {code} via the queue, deduplicated, re-pointed and deleted it"
+
+
+async def admin_links_redirect_straight() -> str:
+    admin, visitor, bare = await signed_in("admin"), anonymous(), anonymous(APP_URL)
+    long_url = f"https://example.com/e2e/{uuid.uuid4().hex}"
+    link = await created_link(admin, long_url)
+    code = link["short_code"]
+    assert await redirect_target(visitor, code) == (302, long_url)
+    assert await redirect_target(bare, code) == (302, long_url)
+    head = await visitor.head(f"/{code}")
+    assert (head.status_code, head.headers.get("location")) == (302, long_url)
+    changed = await admin.patch(f"/api/links/{link['id']}", json={"long_url": f"{long_url}/changed"})
+    assert changed.status_code == 200, changed.text
+    assert await redirect_target(visitor, code) == (302, f"{long_url}/changed")
+    assert (await admin.delete(f"/api/links/{link['id']}")).status_code == 204
+    for client in (admin, visitor, bare):
+        await client.aclose()
+    return f"the admin's link {code} redirects an anonymous visitor straight, also after a re-point"
+
+
+async def members_links_ask_everyone_first() -> str:
+    alice, admin, visitor = await signed_in("alice"), await signed_in("admin"), anonymous()
+    long_url = f"https://example.com/e2e/{uuid.uuid4().hex}"
+    code = (await created_link(alice, long_url))["short_code"]
+    for client in (visitor, admin, alice):
+        page = await client.get(f"/{code}", headers={"Accept": "text/html"})
+        assert (page.status_code, page.headers.get("location")) == (200, None), page.status_code
+        assert f'href="{long_url}" rel="noopener noreferrer nofollow ugc"' in page.text, page.text
+    for client in (alice, admin, visitor):
+        await client.aclose()
+    return f"alice's link {code} shows its destination to a visitor, the admin and alice herself"
+
+
+async def short_links_are_the_only_public_paths() -> str:
+    visitor = anonymous()
+    assert (await visitor.get("/Albert")).status_code == 200
+    assert (await visitor.head("/NanoGH")).status_code == 200
+    assert (await visitor.get("/zzzzzz")).status_code == 404
+    assert (await visitor.get("/api/me")).status_code == 401
+    for method, path in (("GET", "/"), ("GET", "/assets"), ("GET", "/oauth2"), ("POST", "/Albert")):
+        answer = await visitor.request(method, path)
+        assert answer.headers.get("location") == "/__dev/login", (method, path, answer.status_code)
+    await visitor.aclose()
+    return "without signing in, only GET and HEAD of a short code reach the app"
 
 
 async def isolation_between_owners() -> str:
@@ -105,11 +169,7 @@ async def guest_sandbox() -> str:
 async def sandbox_links_ask_first() -> str:
     guest = await signed_in("guest")
     long_url = f"https://example.com/e2e/{uuid.uuid4().hex}"
-    accepted = await guest.post("/api/links", json={"long_url": long_url})
-    assert accepted.status_code == 202, accepted.text
-    link = (await polled_result(guest, accepted.json()["task_id"]))["link"]
-    assert isinstance(link, dict)
-    code = link["short_code"]
+    code = (await created_link(guest, long_url))["short_code"]
     page = await guest.get(f"/{code}", headers={"Accept": "text/html"})
     assert (page.status_code, page.headers.get("location")) == (200, None), page.status_code
     assert f'href="{long_url}"' in page.text, page.text
@@ -158,6 +218,9 @@ async def main() -> int:
     failures = 0
     for step in (
         owner_lifecycle,
+        admin_links_redirect_straight,
+        members_links_ask_everyone_first,
+        short_links_are_the_only_public_paths,
         isolation_between_owners,
         guest_sandbox,
         sandbox_links_ask_first,

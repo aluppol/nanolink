@@ -8,6 +8,7 @@ from nanolink.domain.sandbox import SANDBOX_DAILY_QUOTA, SANDBOX_OWNER_ID
 from nanolink.domain.tasks import CreateLinkTask, TaskStatus
 from tests.support import (
     ADMIN,
+    ADMIN_WHO_IS_ALSO_GUEST,
     ALICE,
     GUEST,
     GUEST_IN_OTHER_SESSION,
@@ -114,14 +115,25 @@ CASES = [
         TaskStatus.QUEUED,
     ),
     Case(
-        "admin has no quota",
+        "admin has no quota and writes a link that redirects straight",
         ADMIN,
         URL,
         {},
         RecordingQueue(),
         None,
-        queued_for(ADMIN.subject, None),
+        (CreateLinkTask("task-1", ADMIN.subject, URL, None, is_trusted=True),),
         {},
+        TaskStatus.QUEUED,
+    ),
+    Case(
+        "an admin signed in as a guest writes an ordinary sandbox link",
+        ADMIN_WHO_IS_ALSO_GUEST,
+        URL,
+        {},
+        RecordingQueue(),
+        None,
+        GUEST_QUEUED,
+        {"guest-mixed-0005": 1, SANDBOX: 1},
         TaskStatus.QUEUED,
     ),
     Case(

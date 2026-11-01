@@ -1,17 +1,17 @@
 import {
-  activeLink,
   DELETED_LINK,
   type LinkResolution,
   type LinkState,
   MISSING_LINK,
-  sandboxedLink,
+  trustedLink,
+  untrustedLink,
 } from "../domain/linkResolution.js";
 
-const FORMAT_VERSION = 2;
+const FORMAT_VERSION = 3;
 
 const LIFETIME_SECONDS: Readonly<Record<LinkState, number>> = {
-  active: 300,
-  sandboxed: 300,
+  trusted: 300,
+  untrusted: 300,
   deleted: 3600,
   missing: 30,
 };
@@ -25,7 +25,7 @@ export function cacheLifetimeSeconds(resolution: LinkResolution): number {
 }
 
 export function encodeCacheEntry(resolution: LinkResolution): string {
-  if (resolution.state === "active" || resolution.state === "sandboxed") {
+  if (resolution.state === "trusted" || resolution.state === "untrusted") {
     return JSON.stringify({
       version: FORMAT_VERSION,
       state: resolution.state,
@@ -40,11 +40,11 @@ export function decodeCacheEntry(entry: string): LinkResolution | undefined {
   if (fields?.version !== FORMAT_VERSION) {
     return undefined;
   }
-  if (fields.state === "active" && typeof fields.long_url === "string") {
-    return activeLink(fields.long_url);
+  if (fields.state === "trusted" && typeof fields.long_url === "string") {
+    return trustedLink(fields.long_url);
   }
-  if (fields.state === "sandboxed" && typeof fields.long_url === "string") {
-    return sandboxedLink(fields.long_url);
+  if (fields.state === "untrusted" && typeof fields.long_url === "string") {
+    return untrustedLink(fields.long_url);
   }
   if (fields.state === "deleted") {
     return DELETED_LINK;

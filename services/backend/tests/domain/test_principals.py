@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
-from nanolink.domain.principals import GUEST_DAILY_QUOTA, USER_DAILY_QUOTA, Principal, Role, is_owner_id
+from nanolink.domain.principals import GUEST_DAILY_QUOTA, USER_DAILY_QUOTA, Principal, is_owner_id
 from nanolink.domain.sandbox import SANDBOX_OWNER_ID
-from tests.support import ADMIN, ALICE, GUEST, GUEST_IN_SESSION, report_mismatches
+from tests.support import ADMIN, ADMIN_WHO_IS_ALSO_GUEST, ALICE, GUEST, GUEST_IN_SESSION, report_mismatches
 
 
 @dataclass(frozen=True)
@@ -15,11 +15,8 @@ class Case:
     is_admin: bool
     is_guest: bool
     notify_email: str | None
+    writes_trusted_links: bool
 
-
-ADMIN_WHO_IS_ALSO_GUEST = Principal(
-    "mixed-0005", "mixed", "m@example.org", frozenset({Role.ADMIN, Role.GUEST})
-)
 
 CASES = [
     Case(
@@ -31,6 +28,7 @@ CASES = [
         is_admin=False,
         is_guest=False,
         notify_email=ALICE.email,
+        writes_trusted_links=False,
     ),
     Case(
         "admin has no quota",
@@ -41,6 +39,7 @@ CASES = [
         is_admin=True,
         is_guest=False,
         notify_email=None,
+        writes_trusted_links=True,
     ),
     Case(
         "guest works in the sandbox, counted by subject without a session",
@@ -51,6 +50,7 @@ CASES = [
         is_admin=False,
         is_guest=True,
         notify_email=None,
+        writes_trusted_links=False,
     ),
     Case(
         "guest in a session is counted per session",
@@ -61,6 +61,7 @@ CASES = [
         is_admin=False,
         is_guest=True,
         notify_email=None,
+        writes_trusted_links=False,
     ),
     Case(
         "guest role wins over admin",
@@ -71,6 +72,7 @@ CASES = [
         is_admin=False,
         is_guest=True,
         notify_email=None,
+        writes_trusted_links=False,
     ),
 ]
 
@@ -85,6 +87,7 @@ def test_principal_rules() -> None:
             case.principal.is_admin,
             case.principal.is_guest,
             case.principal.notify_email,
+            case.principal.writes_trusted_links,
         )
         expected = (
             case.owner_id,
@@ -93,6 +96,7 @@ def test_principal_rules() -> None:
             case.is_admin,
             case.is_guest,
             case.notify_email,
+            case.writes_trusted_links,
         )
         if actual != expected:
             mismatches.append(f"{case.id}: expected {expected}, got {actual}")

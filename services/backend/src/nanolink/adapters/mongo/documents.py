@@ -32,6 +32,7 @@ def document_from_draft(draft: LinkDraft, now: datetime) -> Document:
         "short_code": draft.short_code,
         "long_url": draft.long_url,
         "owner_id": draft.owner_id,
+        "trusted": draft.is_trusted,
         "task_id": draft.task_id,
         "created_at": now,
         "updated_at": now,

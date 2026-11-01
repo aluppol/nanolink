@@ -4,7 +4,18 @@ from dataclasses import dataclass
 from nanolink.application.link_management import LinkModeration, OwnedLinkManagement
 from nanolink.domain.errors import DuplicateLongUrl, InvalidLongUrl, LinkNotFound, NotAuthorized
 from nanolink.domain.links import LinkDraft, PageRequest
-from tests.support import ADMIN, ALICE, BOB, InMemoryLinks, RecordingCache, report_mismatches
+from nanolink.domain.principals import Principal
+from nanolink.domain.sandbox import SANDBOX_OWNER_ID
+from tests.support import (
+    ADMIN,
+    ADMIN_WHO_IS_ALSO_GUEST,
+    ALICE,
+    BOB,
+    GUEST,
+    InMemoryLinks,
+    RecordingCache,
+    report_mismatches,
+)
 
 ALICE_A = LinkDraft("t-a", "AliceA", "https://example.com/a", ALICE.subject)
 ALICE_B = LinkDraft("t-b", "AliceB", "https://example.com/b", ALICE.subject)
@@ -141,6 +152,90 @@ async def test_pages_run_newest_first_and_end_with_no_cursor() -> None:
     assert [link.short_code for link in first.links] == ["BobbyC", "AliceB"]
     assert [link.short_code for link in second.links] == ["AliceA"]
     assert second.next_cursor is None
+
+
+ADMIN_OLD = LinkDraft("t-o", "AdminO", "https://example.com/o", ADMIN.subject)
+ADMIN_TRUSTED = LinkDraft("t-d", "AdminD", "https://example.com/d", ADMIN.subject, is_trusted=True)
+ALICE_FROM_ADMIN_DAYS = LinkDraft("t-f", "AliceF", "https://example.com/f", ALICE.subject, is_trusted=True)
+SANDBOX_S = LinkDraft("t-s", "Sandbx", "https://example.com/s", SANDBOX_OWNER_ID)
+TRUSTED_BEFORE = frozenset({"AdminD", "AliceF"})
+
+
+@dataclass(frozen=True)
+class TrustCase:
+    id: str
+    principal: Principal
+    short_code: str
+    long_url: str
+    trusted_after: frozenset[str]
+
+
+TRUST_CASES = [
+    TrustCase(
+        "an admin's re-point makes an older link redirect straight",
+        ADMIN,
+        "AdminO",
+        "https://example.com/new",
+        TRUSTED_BEFORE | {"AdminO"},
+    ),
+    TrustCase(
+        "an admin re-pointing to the same address also makes it redirect straight",
+        ADMIN,
+        "AdminO",
+        "https://example.com/o",
+        TRUSTED_BEFORE | {"AdminO"},
+    ),
+    TrustCase(
+        "an admin's re-point keeps a trusted link trusted",
+        ADMIN,
+        "AdminD",
+        "https://example.com/new",
+        TRUSTED_BEFORE,
+    ),
+    TrustCase(
+        "a member's re-point leaves the link asking first",
+        ALICE,
+        "AliceA",
+        "https://example.com/new",
+        TRUSTED_BEFORE,
+    ),
+    TrustCase(
+        "a re-point by someone who is no longer an admin drops the trust",
+        ALICE,
+        "AliceF",
+        "https://example.com/new",
+        TRUSTED_BEFORE - {"AliceF"},
+    ),
+    TrustCase(
+        "a guest's re-point leaves a sandbox link asking first",
+        GUEST,
+        "Sandbx",
+        "https://example.com/new",
+        TRUSTED_BEFORE,
+    ),
+    TrustCase(
+        "an admin signed in as a guest cannot make a sandbox link redirect",
+        ADMIN_WHO_IS_ALSO_GUEST,
+        "Sandbx",
+        "https://example.com/new",
+        TRUSTED_BEFORE,
+    ),
+]
+
+
+async def run_trust_case(case: TrustCase) -> str | None:
+    links = InMemoryLinks()
+    drafts = (ALICE_A, ADMIN_OLD, ADMIN_TRUSTED, ALICE_FROM_ADMIN_DAYS, SANDBOX_S)
+    ids = {draft.short_code: links.add_active(draft).id for draft in drafts}
+    owned = OwnedLinkManagement(links, links, RecordingCache())
+    await owned.change_long_url(case.principal, ids[case.short_code], case.long_url)
+    actual = links.trusted_codes()
+    return None if actual == case.trusted_after else f"{case.id}: expected {case.trusted_after}, got {actual}"
+
+
+async def test_a_re_point_records_whether_its_author_was_an_admin() -> None:
+    outcomes = [await run_trust_case(case) for case in TRUST_CASES]
+    report_mismatches([outcome for outcome in outcomes if outcome is not None])
 
 
 async def test_owner_listing_shows_only_their_links() -> None:

@@ -23,7 +23,7 @@ class OwnedLinkManagement:
     async def change_long_url(self, principal: Principal, link_id: str, long_url: str) -> None:
         ensure_valid_long_url(long_url)
         link = await self.read(principal, link_id)
-        await self._editor.change_long_url(link.id, long_url)
+        await self._editor.change_long_url(link.id, long_url, is_trusted=principal.writes_trusted_links)
         await self._cache.forget([link.short_code])
 
     async def delete(self, principal: Principal, link_id: str) -> None:

@@ -8,10 +8,10 @@ import {
 } from "../src/adapters/linkCache.js";
 import { ReadThroughLinkSource } from "../src/adapters/readThroughLinkSource.js";
 import {
-  activeLink,
   DELETED_LINK,
   type LinkResolution,
   MISSING_LINK,
+  trustedLink,
 } from "../src/domain/linkResolution.js";
 import { type Case, mismatchesOf } from "./support/cases.js";
 import {
@@ -22,7 +22,7 @@ import {
 } from "./support/fakes.js";
 
 const CODE = "aB3xY9";
-const DESTINATION = activeLink("https://example.org/");
+const DESTINATION = trustedLink("https://example.org/");
 
 interface Situation {
   readonly cached: CacheLookup;
@@ -37,7 +37,7 @@ interface Outcome {
 
 const CASES: readonly Case<Situation, Outcome>[] = [
   {
-    id: "cached active link skips the database",
+    id: "cached trusted link skips the database",
     input: { cached: cacheHit(DESTINATION), inDatabase: DELETED_LINK },
     expected: { resolution: DESTINATION, askedDatabaseFor: [], cachedAfterwards: [] },
   },
@@ -52,7 +52,7 @@ const CASES: readonly Case<Situation, Outcome>[] = [
     expected: { resolution: MISSING_LINK, askedDatabaseFor: [], cachedAfterwards: [] },
   },
   {
-    id: "miss reads the database and caches the active link",
+    id: "miss reads the database and caches the trusted link",
     input: { cached: CACHE_MISS, inDatabase: DESTINATION },
     expected: {
       resolution: DESTINATION,

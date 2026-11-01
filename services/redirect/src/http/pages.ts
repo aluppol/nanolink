@@ -5,7 +5,7 @@ const PAGE_STYLE = [
   "font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;",
   "background:#f6f7f9;color:#1c2330}",
   "main{max-width:32rem;padding:2rem}",
-  "h1{font-size:1.5rem;margin:0 0 .75rem}",
+  "h1{font-size:1.5rem;margin:0 0 .75rem;overflow-wrap:anywhere}",
   "p{line-height:1.5;margin:0 0 1.25rem;color:#4a5263}",
   "a{color:#2b59c3}",
   "code,.host{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}",
@@ -62,13 +62,13 @@ export function confirmationPage(longUrl: URL): string {
   const escapedHref = escapeHtml(longUrl.href);
   const escapedHost = escapeHtml(longUrl.host);
   return renderPage(
-    "Check this link",
-    "Check where this link goes",
-    "This link was made with the shared guest account, which anyone can use.",
-    "Nobody has checked where it leads. Continue only if you trust this address:",
+    "Leaving NanoLink",
+    `You are leaving NanoLink for <span class="host">${escapedHost}</span>`,
+    "This short link leads to another website. Its full address is:",
     `<code>${escapedHref}</code>`,
+    "NanoLink does not check where links lead. Continue only if you trust this address.",
     [
-      `<a class="continue" href="${escapedHref}" rel="noreferrer nofollow ugc">`,
+      `<a class="continue" href="${escapedHref}" rel="noopener noreferrer nofollow ugc">`,
       `Continue to <span class="host">${escapedHost}</span></a>`,
     ].join(""),
   );

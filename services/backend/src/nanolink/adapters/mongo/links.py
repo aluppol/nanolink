@@ -41,14 +41,17 @@ class MongoLinks:
     async def list_all(self, page: PageRequest) -> LinkPage:
         return await self._page(dict(ACTIVE), page)
 
-    async def change_long_url(self, link_id: str, long_url: str) -> None:
+    async def change_long_url(self, link_id: str, long_url: str, *, is_trusted: bool) -> None:
         object_id = object_id_or_none(link_id)
         if object_id is None:
             return
         try:
             await self._links.update_one(
                 {"_id": object_id, **ACTIVE},
-                {"$set": {"long_url": long_url}, "$currentDate": {"updated_at": True}},
+                {
+                    "$set": {"long_url": long_url, "trusted": is_trusted},
+                    "$currentDate": {"updated_at": True},
+                },
             )
         except DuplicateKeyError as error:
             raise DuplicateLongUrl from error

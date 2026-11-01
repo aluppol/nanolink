@@ -21,7 +21,9 @@ class LinkCreationRequests:
     async def submit(self, principal: Principal, task_id: str, long_url: str) -> None:
         ensure_valid_long_url(long_url)
         await self._consume_quota(principal)
-        task = CreateLinkTask(task_id, principal.owner_id, long_url, principal.notify_email)
+        task = CreateLinkTask(
+            task_id, principal.owner_id, long_url, principal.notify_email, principal.writes_trusted_links
+        )
         try:
             await self._queue.enqueue(task)
         except DependencyUnavailable:

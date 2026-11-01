@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-readonly TARGET="${TARGET:?set TARGET to a link made by a member, such as http://web:8080/aB3xY9; sandbox links do not redirect}"
+readonly TARGET="${TARGET:?set TARGET to a link an admin made, such as http://web:8080/aB3xY9; other links do not redirect}"
 readonly NETWORK="${NETWORK:-nanolink_back}"
 readonly DURATION_SECONDS="${DURATION_SECONDS:-30}"
 readonly LOAD_IMAGE="nanolink/bench:autocannon-8.0.0"

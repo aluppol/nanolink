@@ -21,6 +21,7 @@ class CreateLinkTask:
     owner_id: str
     long_url: str
     notify_email: str | None
+    is_trusted: bool = False
 
 
 @dataclass(frozen=True, slots=True)

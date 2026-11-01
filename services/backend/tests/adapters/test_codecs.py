@@ -19,6 +19,7 @@ LINK = Link(
     "65f0c1f6e8a3b4c2d9e1f0a1", "aB3xY9", "https://example.com/", "alice-0001", FIXED_TIME, FIXED_TIME
 )
 TASK = CreateLinkTask("task-1", "alice-0001", "https://example.com/", "alice@example.org")
+TRUSTED_TASK = CreateLinkTask("task-2", "admin-0003", "https://example.com/", None, is_trusted=True)
 RESULTS = [
     TaskResult(TaskReport("task-1", "alice-0001", TaskStatus.CREATED, LINK, None), "alice@example.org"),
     TaskResult(TaskReport("task-2", "sandbox", TaskStatus.FAILED, None, "no free short code"), None),
@@ -26,7 +27,11 @@ RESULTS = [
 
 
 def test_queue_messages_round_trip() -> None:
-    mismatches = [] if decode_task(encode_task(TASK)) == TASK else ["task did not survive the round trip"]
+    mismatches = [
+        f"task {task.task_id} did not survive the round trip"
+        for task in (TASK, TRUSTED_TASK)
+        if decode_task(encode_task(task)) != task
+    ]
     mismatches += [
         f"result {result.report.task_id} did not survive the round trip"
         for result in RESULTS
@@ -35,7 +40,16 @@ def test_queue_messages_round_trip() -> None:
     report_mismatches(mismatches)
 
 
-MALFORMED = [b"", b"not json", b"{}", b'{"task_id": 1}', b'{"task_id":"t","owner_id":"o"}']
+TASK_FIELDS = b'"task_id":"t","owner_id":"o","long_url":"https://example.com/","notify_email":null'
+MALFORMED = [
+    b"",
+    b"not json",
+    b"{}",
+    b'{"task_id": 1}',
+    b'{"task_id":"t","owner_id":"o"}',
+    b"{" + TASK_FIELDS + b',"trusted":"true"}',
+    b"{" + TASK_FIELDS + b',"trusted":1}',
+]
 
 
 def test_malformed_queue_messages_are_rejected() -> None:
@@ -44,12 +58,22 @@ def test_malformed_queue_messages_are_rejected() -> None:
     assert accepted == []
 
 
+def test_a_task_queued_before_links_carried_trust_is_untrusted() -> None:
+    decoded = decode_task(b"{" + TASK_FIELDS + b"}")
+    assert decoded == CreateLinkTask("t", "o", "https://example.com/", None)
+    assert decoded is not None
+    assert decoded.is_trusted is False
+
+
 def test_link_documents_map_both_ways() -> None:
     draft = LinkDraft("task-1", "aB3xY9", "https://example.com/", "alice-0001")
     document = {"_id": ObjectId(LINK.id), **document_from_draft(draft, FIXED_TIME)}
     assert document["deleted_at"] is None
     assert document["task_id"] == "task-1"
+    assert document["trusted"] is False
     assert link_from_document(document) == LINK
+    trusted = LinkDraft("task-2", "aB3xY8", "https://example.com/", "admin-0003", is_trusted=True)
+    assert document_from_draft(trusted, FIXED_TIME)["trusted"] is True
 
 
 def test_task_documents_map_both_ways() -> None:

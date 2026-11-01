@@ -8,11 +8,11 @@ import {
 } from "../src/adapters/linkCache.js";
 import { type KeyValueStore, ValkeyLinkCache } from "../src/adapters/valkeyLinkCache.js";
 import {
-  activeLink,
   DELETED_LINK,
   type LinkResolution,
   MISSING_LINK,
-  sandboxedLink,
+  trustedLink,
+  untrustedLink,
 } from "../src/domain/linkResolution.js";
 import { type Case, mismatchesOf } from "./support/cases.js";
 import {
@@ -25,10 +25,10 @@ import {
 const DEADLINE_MILLISECONDS = 20;
 
 const STORED = new InMemoryKeyValueStore({
-  "link:aB3xY9": '{"version":2,"state":"active","long_url":"https://example.org/"}',
-  "link:sAndB0": '{"version":2,"state":"sandboxed","long_url":"https://example.org/"}',
-  "link:dE1eT3": '{"version":2,"state":"deleted"}',
-  "link:mI55nG": '{"version":2,"state":"missing"}',
+  "link:aB3xY9": '{"version":3,"state":"trusted","long_url":"https://example.org/"}',
+  "link:sAndB0": '{"version":3,"state":"untrusted","long_url":"https://example.org/"}',
+  "link:dE1eT3": '{"version":3,"state":"deleted"}',
+  "link:mI55nG": '{"version":3,"state":"missing"}',
   "link:bR0k3n": "{not json",
 });
 
@@ -39,14 +39,14 @@ interface LookupInput {
 
 const LOOKUP_CASES: readonly Case<LookupInput, CacheLookup>[] = [
   {
-    id: "active entry is a hit",
+    id: "trusted entry is a hit",
     input: { store: STORED, shortCode: "aB3xY9" },
-    expected: cacheHit(activeLink("https://example.org/")),
+    expected: cacheHit(trustedLink("https://example.org/")),
   },
   {
-    id: "sandboxed entry is a hit",
+    id: "untrusted entry is a hit",
     input: { store: STORED, shortCode: "sAndB0" },
-    expected: cacheHit(sandboxedLink("https://example.org/")),
+    expected: cacheHit(untrustedLink("https://example.org/")),
   },
   {
     id: "deleted entry is a hit",
@@ -87,23 +87,23 @@ interface CacheWrite {
 
 const STORE_CASES: readonly Case<CacheWrite, KeyValueWrite[]>[] = [
   {
-    id: "active is written for 300 s",
-    input: { shortCode: "aB3xY9", resolution: activeLink("https://example.org/") },
+    id: "trusted is written for 300 s",
+    input: { shortCode: "aB3xY9", resolution: trustedLink("https://example.org/") },
     expected: [
       {
         key: "link:aB3xY9",
-        value: '{"version":2,"state":"active","long_url":"https://example.org/"}',
+        value: '{"version":3,"state":"trusted","long_url":"https://example.org/"}',
         seconds: 300,
       },
     ],
   },
   {
-    id: "sandboxed is written for 300 s",
-    input: { shortCode: "sAndB0", resolution: sandboxedLink("https://example.org/") },
+    id: "untrusted is written for 300 s",
+    input: { shortCode: "sAndB0", resolution: untrustedLink("https://example.org/") },
     expected: [
       {
         key: "link:sAndB0",
-        value: '{"version":2,"state":"sandboxed","long_url":"https://example.org/"}',
+        value: '{"version":3,"state":"untrusted","long_url":"https://example.org/"}',
         seconds: 300,
       },
     ],
@@ -111,12 +111,12 @@ const STORE_CASES: readonly Case<CacheWrite, KeyValueWrite[]>[] = [
   {
     id: "deleted is written for 3600 s",
     input: { shortCode: "dE1eT3", resolution: DELETED_LINK },
-    expected: [{ key: "link:dE1eT3", value: '{"version":2,"state":"deleted"}', seconds: 3600 }],
+    expected: [{ key: "link:dE1eT3", value: '{"version":3,"state":"deleted"}', seconds: 3600 }],
   },
   {
     id: "missing is written for 30 s",
     input: { shortCode: "mI55nG", resolution: MISSING_LINK },
-    expected: [{ key: "link:mI55nG", value: '{"version":2,"state":"missing"}', seconds: 30 }],
+    expected: [{ key: "link:mI55nG", value: '{"version":3,"state":"missing"}', seconds: 30 }],
   },
 ];
 

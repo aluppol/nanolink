@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { activeLink, DELETED_LINK, type LinkResolution } from "../src/domain/linkResolution.js";
+import { DELETED_LINK, type LinkResolution, trustedLink } from "../src/domain/linkResolution.js";
 import { LinkResolver } from "../src/domain/linkResolver.js";
 import { type Case, mismatchesOf } from "./support/cases.js";
 import { InMemoryLinkSource } from "./support/fakes.js";
@@ -11,15 +11,15 @@ interface Outcome {
 }
 
 const LINKS = {
-  aB3xY9: activeLink("https://example.org/"),
+  aB3xY9: trustedLink("https://example.org/"),
   dE1eT3: DELETED_LINK,
 };
 
 const CASES: readonly Case<string, Outcome>[] = [
   {
-    id: "active code is answered by the source",
+    id: "trusted code is answered by the source",
     input: "aB3xY9",
-    expected: { resolution: activeLink("https://example.org/"), askedSourceFor: ["aB3xY9"] },
+    expected: { resolution: trustedLink("https://example.org/"), askedSourceFor: ["aB3xY9"] },
   },
   {
     id: "deleted code is answered by the source",

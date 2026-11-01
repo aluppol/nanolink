@@ -12,7 +12,7 @@ export interface Representation {
   readonly gone: string;
   readonly unavailable: string;
   readonly internalError: string;
-  readonly sandboxed: (longUrl: URL) => string;
+  readonly confirmation: (longUrl: URL) => string;
 }
 
 export const HTML_REPRESENTATION: Representation = {
@@ -21,7 +21,7 @@ export const HTML_REPRESENTATION: Representation = {
   gone: GONE_PAGE,
   unavailable: UNAVAILABLE_PAGE,
   internalError: INTERNAL_ERROR_PAGE,
-  sandboxed: confirmationPage,
+  confirmation: confirmationPage,
 };
 
 export const JSON_REPRESENTATION: Representation = {
@@ -30,7 +30,7 @@ export const JSON_REPRESENTATION: Representation = {
   gone: JSON.stringify({ error: "gone" }),
   unavailable: JSON.stringify({ error: "unavailable" }),
   internalError: JSON.stringify({ error: "internal" }),
-  sandboxed: (longUrl) => JSON.stringify({ long_url: longUrl.href }),
+  confirmation: (longUrl) => JSON.stringify({ long_url: longUrl.href }),
 };
 
 export function representationFor(acceptHeader: string | undefined): Representation {
